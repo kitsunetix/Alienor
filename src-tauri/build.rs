@@ -162,6 +162,32 @@ fn main() {
         let windows_manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
         let windows_manifest_path = PathBuf::from(&windows_manifest_dir);
 
+        // Ensure mpv.dll is available (some builds link to mpv.dll instead of libmpv-2.dll)
+        let libmpv_src = windows_manifest_path.join("libmpv-2.dll");
+        let mpv_dst = windows_manifest_path.join("mpv.dll");
+        if libmpv_src.exists() {
+            let should_copy = !mpv_dst.exists()
+                || fs::metadata(&libmpv_src)
+                    .ok()
+                    .and_then(|m| m.modified().ok())
+                    .zip(fs::metadata(&mpv_dst).ok().and_then(|m| m.modified().ok()))
+                    .map_or(true, |(src_time, dst_time)| src_time > dst_time);
+
+            if should_copy {
+                match fs::copy(&libmpv_src, &mpv_dst) {
+                    Ok(_) => println!("cargo:warning=mpv.dll copied from libmpv-2.dll"),
+                    Err(e) => println!("cargo:warning=Failed to copy mpv.dll: {}", e),
+                }
+            } else {
+                println!("cargo:warning=mpv.dll is already up-to-date.");
+            }
+        } else {
+            println!(
+                "cargo:warning=libmpv-2.dll not found at {:?}, skipping mpv.dll copy",
+                libmpv_src
+            );
+        }
+
         // --- Scripts copy logic ---
         let scripts_src = windows_manifest_path.join("scripts");
         let scripts_dst = windows_manifest_path.join("scripts");

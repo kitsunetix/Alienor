@@ -1,7 +1,7 @@
 {
   "name": "alien",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.1",
   "scripts": {
     "tauri": "tauri",
     "dev": "npm run tauri dev",

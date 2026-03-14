@@ -1,6 +1,6 @@
 [package]
 name = "alien"
-version = "0.1.0"
+version = "1.0.1"
 description = "A video synchronization tool for animation reference"
 authors = ["Cautioned"]
 edition = "2021"
@@ -53,4 +53,3 @@ debug = true       # Keep debug info for development
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-updater = "2"
-

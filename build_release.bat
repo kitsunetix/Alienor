@@ -44,6 +44,7 @@ if not exist "%MPV_SOURCE%\libmpv-2.dll" (
 :: Copy MPV DLL to release directory
 echo Copying MPV DLL to release directory...
 copy /Y "%MPV_SOURCE%\libmpv-2.dll" "src-tauri\target\release\libmpv-2.dll"
+copy /Y "%MPV_SOURCE%\libmpv-2.dll" "src-tauri\target\release\mpv.dll"
 
 :: Generate the lib file from the DLL
 echo Generating MPV lib file...
