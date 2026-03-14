@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Alien",
-  "version": "0.2.1",
-  "identifier": "com.cautioned.alien",
+  "productName": "Alienor",
+  "version": "1.0.0",
+  "identifier": "com.kitsunetix.alienor",
   "app": {
     "withGlobalTauri": true,
     "security": {
@@ -32,11 +32,11 @@
       "icons/icon.ico"
     ],
     "createUpdaterArtifacts": true,
-    "copyright": "Copyright © 2025 Cautioned",
+    "copyright": "Copyright (c) 2026 kitsunetix",
     "category": "Productivity",
     "licenseFile": "LICENSE.txt",
-    "shortDescription": "A video synchronization tool for animation reference",
-    "longDescription": "Alien is a video synchronization tool for animation reference. It's to be used with the Alien Roblox Studio plugin, which will allow you to sync animations with moon animator or any other plugins that use the api.",
+    "shortDescription": "Alienor is a video synchronization tool for animation reference",
+    "longDescription": "Alienor is a video synchronization tool for animation reference. It's to be used with the Alienor Roblox Studio plugin, which will allow you to sync animations with Moon Animator or any other plugins that use the API.",
     "resources": [
       "scripts/*",
       "templates/*"

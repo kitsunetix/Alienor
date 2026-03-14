@@ -410,7 +410,7 @@ async fn handle_socket(mut socket: axum::extract::ws::WebSocket, state: Arc<AppS
                                             let offset = state.player.get_offset_seconds();
                                             let adjusted_time = position + offset;
                                             println!("WebSocket seek: adjusted to {} from {} (offset {})", adjusted_time, position, offset);
-                                            if let Err(e) = state.player.command("seek", &[&adjusted_time.to_string(), "absolute"]) {
+                                            if let Err(e) = state.player.command("seek", &[&adjusted_time.to_string(), "absolute", "exact"]) {
                                                 eprintln!("Error seeking: {}", e);
                                                 send_ws_error(&mut socket, "seek", &e.to_string()).await;
                                             }
@@ -724,18 +724,24 @@ async fn set_playback_time(
     AxumState(state): AxumState<Arc<AppState>>,
     Json(payload): Json<serde_json::Value>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    const MIN_SEEK_INTERVAL: u64 = 50;
+    const MIN_SEEK_INTERVAL: u64 = 16;
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis() as u64;
+
+    // Get time from payload (store for file-load auto-seek)
+    let time = payload["time"].as_f64().ok_or((
+        StatusCode::BAD_REQUEST,
+        "Missing or invalid 'time' field".to_string(),
+    ))?;
+    state.player.set_last_moon_time_seconds(time);
 
     // --- Explicit Idle Check First ---
     match state.player.get_handle() {
         Ok(handle) => {
             // Check if a path is loaded. If get_property fails, assume idle.
             if handle.get_property::<String>("path").is_err() {
-                let time = payload["time"].as_f64().unwrap_or(-1.0); // Get time for logging if possible
                 println!(
                     "HTTP seek: Player is idle (no path property), ignoring seek request to {}.",
                     time
@@ -767,12 +773,6 @@ async fn set_playback_time(
         ));
     }
 
-    // Get time from payload
-    let time = payload["time"].as_f64().ok_or((
-        StatusCode::BAD_REQUEST,
-        "Missing or invalid 'time' field".to_string(),
-    ))?;
-
     // Get offset
     let offset = state.player.get_offset_seconds();
     let adjusted_time = time + offset;
@@ -784,14 +784,14 @@ async fn set_playback_time(
     );
     match state
         .player
-        .command("seek", &[&adjusted_time.to_string(), "absolute"])
+        .command("seek", &[&adjusted_time.to_string(), "absolute", "exact"])
     {
         Ok(_) => {
             // Seek succeeded
             state.last_seek.store(now, Ordering::Relaxed);
             Ok(Json(json!({
                 "status": "success",
-                        "ignored": false,
+                "ignored": false,
                 "time": time,
                 "adjusted_time": adjusted_time,
                 "offset": offset,
@@ -1070,7 +1070,7 @@ async fn main() {
             });
 
             // --- Create Tray Menu (Using Builder Pattern) ---
-            let quit_item = MenuItemBuilder::new("Quit Alien")
+            let quit_item = MenuItemBuilder::new("Quit Alienor")
                 .id("quit")
                 .build(&app_handle)?;
             let show_item = MenuItemBuilder::new("Show Main Window")
@@ -1087,7 +1087,7 @@ async fn main() {
 
             let _tray_icon = TrayIconBuilder::new()
                 .menu(&tray_menu)
-                .tooltip("Alien Sync Tool")
+                .tooltip("Alienor")
                 .icon(app_handle.default_window_icon().cloned().ok_or_else(|| tauri::Error::InvalidIcon(std::io::Error::new(ErrorKind::NotFound, "Default icon not found")))?) 
                 .on_menu_event(move |app, event| {
                     let url_clone = url_clone_for_menu.clone(); // Clone again for move closure
@@ -1103,7 +1103,7 @@ async fn main() {
                                 "main", 
                                 WebviewUrl::External(url_clone.parse().expect("Invalid external URL in menu handler")),
                             )
-                            .title("Alien Sync")
+                            .title("Alienor")
                             .inner_size(800.0, 600.0)
                             .build()
                             {
@@ -1124,7 +1124,7 @@ async fn main() {
                                 "main",
                                 WebviewUrl::External(url_clone.parse().expect("Invalid external URL in tray handler")),
                             )
-                            .title("Alien Sync")
+                            .title("Alienor")
                             .inner_size(800.0, 600.0)
                             .build()
                             {
@@ -1144,7 +1144,7 @@ async fn main() {
              )
              .visible(false) // Keep it hidden
              .skip_taskbar(true) // Don't show in taskbar
-             .title("Alien Background Runner") // Optional title
+             .title("Alienor Background Runner") // Optional title
              .inner_size(1.0, 1.0) // Minimal size
              .build()?;
 
@@ -1160,7 +1160,7 @@ async fn main() {
                         "main",
                         WebviewUrl::External(url.parse().expect("Invalid external URL for initial window")),
                     )
-                    .title("Alien Sync")
+                    .title("Alienor")
                     .inner_size(800.0, 600.0)
                     .build()?
                 }

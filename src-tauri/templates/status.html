@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Alien - Video Sync</title>
+    <title>Alienor - Video Sync</title>
     <link rel="stylesheet" href="/static/dist/styles.css">
     <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
     <script src="/tauri.js" defer></script>
@@ -13,7 +13,7 @@
         <!-- Header Section -->
         <div class="card">
             <div class="flex items-center justify-between mb-6 flex-wrap gap-4">
-                <h1 class="text-2xl font-bold text-green-500 md:text-3xl">Alien</h1>
+                <h1 class="text-2xl font-bold text-green-500 md:text-3xl">Alienor</h1>
                 <span id="server-status-badge" class="status-badge whitespace-nowrap transition-colors duration-300">Server Active</span>
             </div>
             <div class="space-y-6">
@@ -22,9 +22,9 @@
                     <h2 class="card-header">Quick Start Guide</h2>
                     <ol class="list-decimal list-inside space-y-2 text-sm sm:text-base">
                         <li>Open Moon Animator in Roblox Studio</li>
-                        <li>Enable the Alien plugin from the Plugins tab</li>
+                        <li>Enable the Alienor plugin from the Plugins tab</li>
                         <li>Enter port <code class="code-block">{current_port}</code> (or your configured port) in the plugin</li>
-                        <li>Click "Connect to Alien" in the plugin</li>
+                        <li>Click "Connect to Alienor" in the plugin</li>
                         <li>Load your video file by dragging it into the player window</li>
                     </ol>
                 </div>
@@ -189,11 +189,11 @@
             <div class="space-y-3 text-sm sm:text-base">
                 <p><span class="text-green-500 mr-1">•</span> If the plugin can't connect, verify the port number matches the 'Current Port' above.</p>
                 <p><span class="text-green-500 mr-1">•</span> Try using 'Use Auto-Detect Port (Next Launch)' if connection issues persist.</p>
-                <p><span class="text-green-500 mr-1">•</span> Ensure your firewall isn't blocking the connection to Alien.</p>
+                <p><span class="text-green-500 mr-1">•</span> Ensure your firewall isn't blocking the connection to Alienor.</p>
                 <p><span class="text-green-500 mr-1">•</span> If video playback stutters, try closing unnecessary applications.</p>
                 <p><span class="text-green-500 mr-1">•</span> Check MPV compatibility if specific video files don't load.</p>
                 <p><span class="text-green-500 mr-1">•</span> <span class="font-semibold">Closing this window</span> hides the app to the system tray (near your clock). The server keeps running. This is recommended if you don't require usage of settings often and will help free up some memory usage.</p>
-                <p><span class="text-green-500 mr-1">•</span> To fully <span class="font-semibold">quit the application</span>, right-click the Alien tray icon and select "Quit Alien".</p>
+                <p><span class="text-green-500 mr-1">•</span> To fully <span class="font-semibold">quit the application</span>, right-click the Alienor tray icon and select "Quit Alienor".</p>
             </div>
         </div>
     </div>
@@ -295,7 +295,7 @@
                     serverStatusText.textContent = 'Disconnected';
                     serverStatusText.className = 'text-red-500 transition-colors duration-300';
                     titleElement.textContent = 'Disconnected';
-                    statusContainer.innerHTML = '<p class="col-span-full sm:col-span-2 text-red-500">Connection failed. Ensure Alien is running and check port settings. You may need to restart Alien or refresh this page.</p>';
+                    statusContainer.innerHTML = '<p class="col-span-full sm:col-span-2 text-red-500">Connection failed. Ensure Alienor is running and check port settings. You may need to restart Alienor or refresh this page.</p>';
                     progressSection.innerHTML = '';
                     break;
             }

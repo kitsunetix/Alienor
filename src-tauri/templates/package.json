@@ -1,7 +1,7 @@
 {
   "name": "alien-templates",
   "version": "1.0.0",
-  "description": "Templates for Alien video sync application",
+  "description": "Templates for Alienor video sync application",
   "scripts": {
     "build:css": "npx tailwindcss -i ./src/input.css -o ./dist/styles.css --minify",
     "watch:css": "npx tailwindcss -i ./src/input.css -o ./dist/styles.css --watch"

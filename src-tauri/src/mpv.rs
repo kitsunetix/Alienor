@@ -43,6 +43,7 @@ pub struct MpvPlayer {
     handle: Arc<Mutex<Mpv>>,
     quit_flag: Arc<AtomicBool>,
     offset_seconds: Arc<AtomicI64>, // Store offset in milliseconds internally
+    last_moon_time_ms: Arc<AtomicI64>, // Last Moon Animator time in milliseconds (-1 if unknown)
 }
 
 unsafe impl Send for MpvPlayer {}
@@ -61,9 +62,10 @@ impl MpvPlayer {
         let essential_opts = [
             ("force-window", "yes"),
             ("input-default-bindings", "yes"),
-            ("title", "Alien - Sync videos with Moon Animator"),
+            ("title", "Alienor - Sync videos with Moon Animator"),
             ("keep-open", "yes"),
             ("keep-open-pause", "yes"),
+            ("hwdec", "no"),
             // UI and OSC settings
             ("ontop", "yes"),
             ("osc", "yes"),
@@ -156,12 +158,14 @@ impl MpvPlayer {
         // Using zero offset by default - user can adjust as needed
         let offset_seconds = Arc::new(AtomicI64::new(0));
         println!("Started with zero playback offset, can be adjusted via UI");
+        let last_moon_time_ms = Arc::new(AtomicI64::new(-1));
 
         Ok((
             MpvPlayer {
                 handle: Arc::new(Mutex::new(mpv)),
                 quit_flag,
                 offset_seconds,
+                last_moon_time_ms,
             },
             exit_receiver,
         ))
@@ -255,6 +259,25 @@ impl MpvPlayer {
         self.offset_seconds.load(Ordering::Relaxed) as f64 / 1000.0
     }
 
+    pub fn set_last_moon_time_seconds(&self, time: f64) {
+        if !time.is_finite() {
+            return;
+        }
+        let clamped = if time < 0.0 { 0.0 } else { time };
+        let millis = (clamped * 1000.0).round() as i64;
+        self.last_moon_time_ms.store(millis, Ordering::Relaxed);
+        println!("Cached Moon time: {:.3}s ({} ms)", clamped, millis);
+    }
+
+    pub fn get_last_moon_time_seconds(&self) -> Option<f64> {
+        let millis = self.last_moon_time_ms.load(Ordering::Relaxed);
+        if millis < 0 {
+            None
+        } else {
+            Some(millis as f64 / 1000.0)
+        }
+    }
+
     // Simplified load_file: Applies offset immediately after loading
     pub fn load_file(&self, file_path: &str) -> Result<(), Error> {
         println!("Loading file: {}", file_path);
@@ -272,7 +295,7 @@ impl MpvPlayer {
                 "Applying significant offset after load: seeking to {} seconds",
                 offset
             );
-            self.command("seek", &[&offset.to_string(), "absolute"])?;
+            self.command("seek", &[&offset.to_string(), "absolute", "exact"])?;
         } else {
             println!(
                 "Offset near zero ({:.3}s), letting MPV start normally.",
@@ -344,19 +367,58 @@ impl MpvPlayer {
     pub fn check_events(&self) {
         // Revert to blocking lock() to ensure events are checked
         if let Ok(mut handle) = self.handle.lock() {
-            let event_context = handle.event_context_mut();
-            // Use a short timeout for wait_event to avoid blocking indefinitely if no events
-            while let Some(Ok(event)) = event_context.wait_event(0.01) {
-                // Use 10ms timeout
-                match event {
-                    Event::Shutdown => {
-                        println!("MPV_EVENT_SHUTDOWN received");
-                        self.quit_flag.store(true, Ordering::Relaxed);
+            let mut saw_shutdown = false;
+            let mut saw_end_file = false;
+            let mut saw_file_loaded = false;
+
+            {
+                let event_context = handle.event_context_mut();
+                // Use a short timeout for wait_event to avoid blocking indefinitely if no events
+                while let Some(Ok(event)) = event_context.wait_event(0.01) {
+                    // Use 10ms timeout
+                    match event {
+                        Event::Shutdown => {
+                            saw_shutdown = true;
+                        }
+                        Event::EndFile(_) => {
+                            saw_end_file = true;
+                        }
+                        Event::FileLoaded => {
+                            saw_file_loaded = true;
+                        }
+                        _ => {}
                     }
-                    Event::EndFile(_) => {
-                        println!("MPV_EVENT_END_FILE received");
+                }
+            }
+
+            if saw_shutdown {
+                println!("MPV_EVENT_SHUTDOWN received");
+                self.quit_flag.store(true, Ordering::Relaxed);
+            }
+            if saw_end_file {
+                println!("MPV_EVENT_END_FILE received");
+            }
+            if saw_file_loaded {
+                // Always pause on file load to allow precise sync
+                if let Err(e) = handle.set_property("pause", true) {
+                    eprintln!("Failed to pause on file load: {}", e);
+                }
+
+                // If we have a cached Moon time, seek to it (with offset)
+                if let Some(time) = self.get_last_moon_time_seconds() {
+                    let offset = self.get_offset_seconds();
+                    let adjusted = (time + offset).max(0.0);
+                    println!(
+                        "MPV file loaded: seeking to Moon time {:.3}s (adjusted {:.3}s, offset {:.3}s)",
+                        time, adjusted, offset
+                    );
+                    if let Err(e) =
+                        handle.command("seek", &[&adjusted.to_string(), "absolute", "exact"])
+                    {
+                        eprintln!("Failed to seek on file load: {}", e);
                     }
-                    _ => {}
+                } else {
+                    println!("MPV file loaded: no cached Moon time yet, skipping auto-seek.");
                 }
             }
         } else {
