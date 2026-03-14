@@ -1,64 +1,50 @@
 # Alienor
 
-A video synchronization tool for animation reference on Roblox Studio. This tool allows you to sync video playback across multiple instances, making it easier to work on animations with reference videos. Currently, only Moon Animator is supported.
+A video synchronization tool for animation reference in Roblox Studio. Syncs video playback across multiple instances and supports Moon Animator.
+
+## Status
+
+- **Windows:** Supported
+- **macOS:** Planned
+- **Linux:** Planned (no port yet)
 
 ## Features
 
-- **Video Synchronization**: Sync video playback across multiple instances
-- **MPV Integration**: High-performance video playback using MPV
-- **YouTube Support**: Play YouTube videos directly (requires yt-dlp), paste the link to the video.
-- **Cross-Platform**: Works on Windows, macOS, and Linux. (probably, just gotta compile it)
+- **Video Sync** across instances
+- **MPV-based playback** for performance
+- **YouTube support** (requires yt-dlp)
 
-## Installation
+## Installation (Windows)
 
-1.  Go to the [latest release page](https://github.com/kitsunetix/Alienor/releases/latest).
-2.  Scroll down to the **Assets** section.
-3.  Download the correct file for your operating system and architecture:
-    *   **Windows:** Look for the .exe file (e.g., `Alienor_x.y.z_x64.exe`) or alternatively, download the .msi file (e.g., `Alienor_x.y.z_x64.msi`).
-    *   **macOS (Apple Silicon/ARM):** Look for the `_aarch64.dmg` file (e.g., `Alienor_x.y.z_aarch64.dmg`). Apple will not let you run it by default, to do this go to System Settings > Privacy & Security, and then click "Open Anyway".
-    *   **macOS (Intel):** Look for the `_x64.dmg` file (e.g., `Alienor_x.y.z_x64.dmg`).
-    *   _(macOS Alternative): If a `.dmg` is not available for your architecture, look for the corresponding `.app.tar.gz` file and extract it._
-    *   **Linux:** Look for the `.AppImage` or `.deb` file.
-4.  Run the downloaded installer (`.msi`, `.dmg`) or the extracted application/AppImage.
-5.  The required `mpv` library is bundled on Windows and macOS. **Linux users need to install `libmpv` separately** using their distribution's package manager (e.g., `sudo apt install libmpv1` on Debian/Ubuntu, `sudo pacman -S mpv` on Arch).
+1. Open the latest release on GitHub and download the installer (`.exe` or `.msi`).
+2. Run the installer.
 
-Windows Defender may falsely think the player is a trojan virus, so if that happens don't worry it's not, I've submitted it to microsoft for review it should clear up soon.
-
-macOS currently doesn't work I need to setup Apple Developer for it.
+Note: Windows Defender may flag it as a false positive. It is safe; a review was submitted.
 
 ## Usage
 
-1. Launch Alienor
-2. Use the port number provided in the app window to connect to the Roblox Plugin. The port number is displayed in the window.
-
-### Controls
-
-- **Play/Pause**: Space bar or click the play/pause button
-- **Seek**: Use the timeline slider or arrow keys
-- **Volume**: Use the volume slider or up/down arrow keys
-- **Fullscreen**: F key or double-click the video
+1. Open Moon Animator in Roblox Studio
+2. Launch Alienor
+3. Enable the Alienor plugin from the Plugins tab
+4. Enter port 3000 (or your configured port) in the plugin. Use the port number provided in the app window to connect to the Roblox Plugin. The port number is displayed in the window.
+5. Click "Connect to Alienor" in the plugin
+6. Load your video file by dragging it into the player window
 
 ## Troubleshooting
 
-### Common Issues
-
 1. **Video won't play**
-   - Check if MPV is installed correctly
-   - Try restarting the application
-   - Verify the video file is supported
+   - Try restarting Alienor
+   - Verify the video file format is supported
 
 2. **YouTube videos don't work**
-   - Ensure yt-dlp is installed (On windows you can install it with winget, open terminal/powershell and run `winget install yt-dlp`)
+   - Install yt-dlp (`winget install yt-dlp`)
    - Check your internet connection
-   - Try a different video URL
 
-### Technical Details
+## Technical Details
 
-The application is built with:
 - Tauri (Rust backend)
 - MPV for video playback
-- WebSocket for synchronization
-- Axum for the web server
+- Axum web server for sync
 
 ## License
 
