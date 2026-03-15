@@ -1,5 +1,11 @@
 # Alienor
 
+Original project by [Cautioned](https://github.com/Cautioned)
+
+This repository is a fork that fixes bugs and issues from the original project, which has been abandoned for about a year.
+
+[Original repository](https://github.com/Cautioned/Alien)
+
 A video synchronization tool for animation reference in Roblox Studio. Syncs video playback across multiple instances and supports Moon Animator.
 
 ## Status
