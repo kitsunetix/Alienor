@@ -1,3 +1,9 @@
+## ⚠️ Notice
+
+- The plugin in Roblox Studio is currently **unlisted**. This is because it is based on the original creator's code with fixes applied, and Roblox does not allow reposts of the original plugin.
+- A full rewrite of the plugin is planned in the future. It will function similarly to the original, so there's no need to worry about major changes.
+- A **Linux port is also planned** and will be worked on in the future.
+
 # Alienor
 
 Original project by [Cautioned](https://github.com/Cautioned)
