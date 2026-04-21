@@ -73,18 +73,19 @@ fn get_legacy_config_path(app_handle: &AppHandle) -> std::io::Result<PathBuf> {
 fn load_config(app_handle: &AppHandle) -> AppConfig {
     match get_config_path(app_handle) {
         Ok(path) => {
+            let default_path = path.clone();
             let legacy_path = get_legacy_config_path(app_handle).ok();
             let load_path = if path.exists() {
-                path
+                path.clone()
             } else if let Some(legacy) = legacy_path {
                 if legacy.exists() {
                     println!("Using legacy config path: {:?}", legacy);
                     legacy
                 } else {
-                    path
+                    path.clone()
                 }
             } else {
-                path
+                path.clone()
             };
 
             if load_path.exists() {
@@ -122,7 +123,7 @@ fn load_config(app_handle: &AppHandle) -> AppConfig {
                     }
                 }
             } else {
-                println!("Config file {:?} not found. Using default.", path);
+                println!("Config file {:?} not found. Using default.", default_path);
                 AppConfig::default()
             }
         }
