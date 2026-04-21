@@ -58,11 +58,6 @@ Note: Windows Defender may flag it as a false positive. It is safe; a review was
 - MPV for video playback
 - Axum web server for sync
 
-## Credits
-
-- Current maintenance and continuation: kitsunetix
-- Original project creator: Cautioned
-
 ## License
 
 [MIT License](LICENSE)
