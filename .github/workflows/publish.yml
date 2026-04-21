@@ -1,287 +1,58 @@
-name: 'publish'
+name: publish
 
 on:
   push:
     branches:
       - release
-  workflow_dispatch: # Allows manual triggering from the GitHub UI
-
-# This workflow will trigger on each push to the `release` branch OR when manually dispatched.
+  workflow_dispatch:
 
 jobs:
   publish-tauri:
+    runs-on: windows-latest
     permissions:
       contents: write
-      id-token: write # Required for Sigstore OIDC token
-      attestations: write # Required to save attestations
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: 'macos-latest' # for Arm based macs (M1 and above).
-            args: '--target aarch64-apple-darwin'
-          - platform: 'macos-latest' # for Intel based macs.
-            args: '--target x86_64-apple-darwin'
-          - platform: 'windows-latest'
-            args: ''
 
-    runs-on: ${{ matrix.platform }}
     steps:
-      - uses: actions/checkout@v4
+      - name: checkout
+        uses: actions/checkout@v4
 
       - name: setup node
         uses: actions/setup-node@v4
         with:
           node-version: lts/*
 
-      - name: install Rust stable
+      - name: setup rust
         uses: dtolnay/rust-toolchain@stable
-        with:
-          # Those targets are only used on macos runners so it's in an `if` to slightly speed up windows and linux builds.
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
-
-      - name: install dependencies (ubuntu only)
-        if: matrix.platform == 'ubuntu-22.04' # This must match the platform value defined above.
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y pkg-config libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libmpv-dev
-        # webkitgtk 4.1 is for Tauri v2.
-
-      # === Find libmpv.so.2 (ubuntu only) ===
-      - name: Find libmpv.so.2
-        if: matrix.platform == 'ubuntu-22.04'
-        run: |
-          echo "Searching for libmpv.so.2..."
-          # Search common library directories
-          find /usr/lib /usr/local/lib -name 'libmpv.so.2*' 2>/dev/null || echo "libmpv.so.2 not found in common dirs."
-
-      # === End Platform Dependencies ===
 
       - name: install frontend dependencies
-        run: npm ci # Use npm ci for cleaner installs in CI
+        run: npm ci
 
-      # === Build Frontend CSS ===
-      - name: Build Tailwind CSS
-        run: npm run build:css # Runs the build:css script from the root package.json
+      - name: build tailwind css
+        run: npm run build:css
 
-      # === Install MSYS2 for gendef/dlltool (Windows Only) ===
-      - name: Install MSYS2
-        if: matrix.platform == 'windows-latest'
-        run: choco install msys2 --params "/InstallDir:C:\msys64" -y
-
-      # === Add MSYS2 tools to PATH (Windows Only) ===
-      - name: Add MSYS2 tools to PATH
-        if: matrix.platform == 'windows-latest'
-        run: echo "C:\msys64\mingw64\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-        shell: pwsh # Use powershell for this step
-
-      # === MPV/Linker Setup ===
-      - name: Download and Setup Pre-compiled mpv (macOS)
-        if: startsWith(matrix.platform, 'macos-')
-        env:
-          RELEASE_URL: https://github.com/eko5624/mpv-mac/releases/download/2025-04-07 
-          # Corrected asset names based on release page
-          ARM64_ASSET: libmpv-arm64-b09e06a920.zip 
-          X86_64_ASSET: libmpv-x86_64-b09e06a920.zip
+      - name: verify mpv files
+        shell: pwsh
         run: |
-          echo "Downloading pre-compiled mpv libraries..."
-          mkdir -p src-tauri/libs/macos # Create directory for the library
-          TEMP_ZIP="mpv_dylib.zip" # Temporary filename for download
-          EXTRACT_DIR="mpv_dylib_extracted"
-          
-          TARGET_ARCH="${{ matrix.args }}" # Get the target string like --target aarch64-apple-darwin
-          DOWNLOAD_URL=""
-          MPV_LIB_PATH="libs/macos" # Relative path for linker/build script
-          CONFIG_CONTENT=""
-          
-          echo "Build target args: $TARGET_ARCH"
-          mkdir -p .cargo # Ensure .cargo directory exists
-          
-          if [[ "$TARGET_ARCH" == *"aarch64-apple-darwin"* ]]; then
-            echo "Setting up for ARM64 build..."
-            DOWNLOAD_URL="${RELEASE_URL}/${ARM64_ASSET}"
-            CONFIG_CONTENT="[target.aarch64-apple-darwin]\nrustflags = [\"-L\", \"$MPV_LIB_PATH\"]"
-          elif [[ "$TARGET_ARCH" == *"x86_64-apple-darwin"* ]]; then
-            echo "Setting up for X86_64 build..."
-            DOWNLOAD_URL="${RELEASE_URL}/${X86_64_ASSET}"
-            CONFIG_CONTENT="[target.x86_64-apple-darwin]\nrustflags = [\"-L\", \"$MPV_LIB_PATH\"]"
-          else
-            echo "::error::Could not determine download URL for target $TARGET_ARCH"
-            exit 1
-          fi
-          
-          # Download the correct zip
-          echo "Downloading from $DOWNLOAD_URL to $TEMP_ZIP"
-          curl -L "$DOWNLOAD_URL" -o "$TEMP_ZIP"
-          if [ $? -ne 0 ]; then
-            echo "::error::Failed to download $DOWNLOAD_URL"
-            exit 1
-          fi
-          
-          # Unzip and find the dylib
-          echo "Unzipping $TEMP_ZIP..."
-          unzip -o "$TEMP_ZIP" -d "$EXTRACT_DIR"
-          if [ $? -ne 0 ]; then
-            echo "::error::Failed to unzip $TEMP_ZIP"
-            exit 1
-          fi
-          
-          # Find the dylib (assuming it's in a 'lib' subdirectory, adjust if needed)
-          # Common names: libmpv.2.dylib, libmpv.dylib
-          FOUND_DYLIB=$(find "$EXTRACT_DIR" -name 'libmpv*.dylib' -print -quit)
-          
-          if [ -z "$FOUND_DYLIB" ]; then
-             echo "::error::Could not find libmpv dylib in extracted archive $EXTRACT_DIR"
-             # List contents for debugging
-             find "$EXTRACT_DIR"
-             exit 1
-          fi
-          
-          echo "Found dylib: $FOUND_DYLIB"
-          
-          # Copy the found dylib to the target location
-          # Use libmpv.dylib as the target filename for the linker (-lmpv)
-          TARGET_DYLIB="src-tauri/libs/macos/libmpv.dylib"
-          echo "Copying $FOUND_DYLIB to $TARGET_DYLIB"
-          cp "$FOUND_DYLIB" "$TARGET_DYLIB"
-          if [ $? -ne 0 ]; then
-            echo "::error::Failed to copy dylib to $TARGET_DYLIB"
-            exit 1
-          fi
-          ls -l src-tauri/libs/macos # Verify copy
-          
-          # Clean up downloaded zip and extracted dir
-          echo "Cleaning up temporary files..."
-          rm "$TEMP_ZIP"
-          rm -rf "$EXTRACT_DIR"
-          
-          # Create the config file
-          echo "Creating .cargo/config.toml"
-          echo -e "$CONFIG_CONTENT" > .cargo/config.toml
-          cat .cargo/config.toml # Print content for verification
-          
-          # Set LIBMPV_LIB_DIR for the build script (relative path)
-          echo "Setting LIBMPV_LIB_DIR=$MPV_LIB_PATH"
-          echo "LIBMPV_LIB_DIR=$MPV_LIB_PATH" >> $GITHUB_ENV
-
-      - name: Download libmpv-2.dll (Windows)
-        if: matrix.platform == 'windows-latest'
-        run: |
-          Invoke-WebRequest -Uri 'https://cautioned.co/libmpv-2.dll' -OutFile 'src-tauri/libmpv-2.dll'
-          echo "libmpv-2.dll downloaded to src-tauri/"
-      
-      - name: Generate MPV .lib file (Windows)
-        if: matrix.platform == 'windows-latest'
-        # Run AFTER installing MSYS2 and adding to PATH
-        shell: powershell # Ensure powershell is used
-        run: |
-          cd src-tauri # Change into src-tauri directory
-          echo "Current directory: $(pwd)"
-          echo "Generating MPV .lib file in $(pwd)..."
-          .\generate-lib.ps1 # Run script from within src-tauri
-          if ($LASTEXITCODE -ne 0) {
-            echo "::error::generate-lib.ps1 failed"
+          if (!(Test-Path "src-tauri/libmpv-2.dll")) {
+            Write-Error "Missing src-tauri/libmpv-2.dll"
             exit 1
           }
-          echo "MPV .lib file generated (hopefully) in $(pwd)"
-          ls *.lib # Verify mpv.lib was created here
-          # Rename the generated file to what the linker expects
-          echo "Renaming libmpv-2.lib to mpv.lib..."
-          Rename-Item -Path .\libmpv-2.lib -NewName mpv.lib
-          ls *.lib # Verify the rename
-          cd .. # Go back to the root directory
-          # We will set the linker path via config.toml instead of ENV var
-
-      # === Add Linker Path for Windows ===
-      - name: Configure Linker Path (Windows)
-        if: matrix.platform == 'windows-latest'
-        shell: powershell
-        run: |
-          mkdir -p .cargo # Ensure .cargo directory exists
-          echo "Adding linker path to .cargo/config.toml for Windows..."
-          $configContent = @"
-          [target.x86_64-pc-windows-msvc]
-          rustflags = ["-L", "src-tauri"]
-          "@
-          # Use .NET method to append without BOM
-          [System.IO.File]::AppendAllText(".cargo/config.toml", $configContent)
-          echo "Contents of .cargo/config.toml:"
-          cat .cargo/config.toml
-
-      # === End MPV/Linker Setup ===
-
-      # === Prepare Linux AppDir ===
-      - name: Prepare Linux AppDir
-        if: matrix.platform == 'ubuntu-22.04'
-        run: |
-          echo "Running preparation for Linux AppDir..."
-          # Find the path to libmpv.so.2.x.y on the runner
-          # Using -L to resolve symlinks and find the real file
-          MPV_SO_RUNNER_PATH=$(ls -L /usr/lib/x86_64-linux-gnu/libmpv.so.2* | head -n 1)
-          echo "::debug::Found system MPV SO: $MPV_SO_RUNNER_PATH"
-
-          # Define the AppDir path relative to src-tauri
-          APPDIR_PATH="target/x86_64-unknown-linux-gnu/release/bundle/appimage/Alien.AppDir/"
-          APPDIR_LIB_PATH="$APPDIR_PATH/usr/lib/"
-
-          # Create the target directory inside AppDir if it doesn't exist
-          mkdir -p "$APPDIR_LIB_PATH"
-          echo "::debug::Created AppDir lib directory: $APPDIR_LIB_PATH"
-
-          # Copy the correct libmpv.so.2.x.y into the AppDir
-          if [ -f "$MPV_SO_RUNNER_PATH" ]; then
-            echo "::debug::Copying $MPV_SO_RUNNER_PATH to $APPDIR_LIB_PATH"
-            cp "$MPV_SO_RUNNER_PATH" "$APPDIR_LIB_PATH"
-
-            # Get the base name of the copied file (e.g., libmpv.so.2.1.0)
-            MPV_SO_BASENAME=$(basename "$MPV_SO_RUNNER_PATH")
-            echo "::debug::Copied $MPV_SO_BASENAME to AppDir"
-
-            # Create symlinks libmpv.so and libmpv.so.2 pointing to the copied file
-            # Use relative paths for symlinks within the AppDir
-            echo "::debug::Creating symlinks in $APPDIR_LIB_PATH"
-            (cd "$APPDIR_LIB_PATH" && ln -sf "$MPV_SO_BASENAME" libmpv.so)
-            (cd "$APPDIR_LIB_PATH" && ln -sf "$MPV_SO_BASENAME" libmpv.so.2)
-            echo "::debug::Symlinks created: $(ls -l $APPDIR_LIB_PATH/libmpv.so*)"
-
-
-            # Remove any libmpv.so.1 files that might have been incorrectly bundled
-            find "$APPDIR_LIB_PATH" -name "libmpv.so.1*" -delete
-            echo "::debug::Removed any libmpv.so.1 files from AppDir."
-
-          else
-            echo "::error::Correct libmpv.so.2.x.y not found on runner. AppImage build may fail."
+          if (!(Test-Path "src-tauri/mpv.lib")) {
+            Write-Error "Missing src-tauri/mpv.lib"
             exit 1
-          fi
+          }
+          Write-Host "mpv files present"
 
-      # === Tauri Build and Release (Single Step) ===
-      - uses: tauri-apps/tauri-action@v0
-        id: tauri_build # Add an ID to reference outputs
+      - name: build and publish tauri release
+        uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # --- Apple Signing & Notarization Secrets (macOS Only) ---
-          APPLE_CERTIFICATE: ${{ matrix.platform == 'macos-latest' && secrets.APPLE_CERTIFICATE || '' }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ matrix.platform == 'macos-latest' && secrets.APPLE_CERTIFICATE_PASSWORD || '' }}
-          APPLE_SIGNING_IDENTITY: ${{ matrix.platform == 'macos-latest' && secrets.APPLE_SIGNING_IDENTITY || '' }}
-          APPLE_ID: ${{ matrix.platform == 'macos-latest' && secrets.APPLE_ID || '' }}
-          APPLE_PASSWORD: ${{ matrix.platform == 'macos-latest' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
-          APPLE_TEAM_ID: ${{ matrix.platform == 'macos-latest' && secrets.APPLE_TEAM_ID || '' }}
-          # --- Windows Signing Secrets ---
-          # RUSTFLAGS and LIBMPV_LIB_DIR are now set via $GITHUB_ENV or .cargo/config.toml
-          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
         with:
-          tagName: app-v__VERSION__ # The action automatically replaces __VERSION__ with the app version.
-          releaseName: 'App v__VERSION__'
-          releaseBody: 'See the assets to download this version and install.'
-          releaseDraft: true # Creates a draft release. Change to false to publish automatically.
-          prerelease: false # Set to true if releasing pre-releases.
+          tagName: v__VERSION__
+          releaseName: v__VERSION__
+          releaseBody: "windows build"
+          releaseDraft: false
+          prerelease: false
           includeUpdaterJson: true
-          args: ${{ matrix.args }}
-      - name: Attest Build Provenance
-        uses: actions/attest-build-provenance@v2 # Use specific version v2.2.3 or check for latest
-        with:
-          subject-path: ${{ steps.tauri_build.outputs.artifactPaths }}
-        
