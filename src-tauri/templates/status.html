@@ -62,68 +62,6 @@
                 <p class="col-span-full sm:col-span-2 text-gray-400">Waiting for WebSocket connection...</p>
             </div>
         </div>
-
-        <!-- Offset Controls -->
-        <div class="card">
-            <h2 class="card-header">Offset Controls</h2>
-            <div class="space-y-6">
-                <!-- Current Offset Display -->
-                <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-y-2">
-                    <p class="text-sm sm:text-base">
-                        <span class="text-green-500">Current offset:</span>
-                        <span id="current-offset" class="font-mono text-gray-300">0.00s (~0 frames @ 30.0 fps)</span>
-                        <span id="offset-active" class="hidden ml-2 py-1 px-2 text-xs bg-green-700 text-white rounded-full">Active</span>
-                    </p>
-                    <button id="reset-offset" 
-                        class="btn btn-outline btn-red whitespace-nowrap text-sm">
-                        Reset Offset
-                    </button>
-                </div>
-                <p class="text-gray-500 text-xs sm:text-sm !mt-1">Applied to all new video loads & synchronization</p>
-                
-                <hr class="border-gray-700/50">
-
-                <!-- Offset Input Mode Toggle -->
-                <div class="flex justify-center space-x-2 pt-2">
-                    <button id="offset-mode-seconds" class="btn-toggle active" data-mode="seconds">Seconds</button>
-                    <span class="text-gray-500">/</span>
-                    <button id="offset-mode-frames" class="btn-toggle" data-mode="frames">Frames</button>
-                </div>
-
-                <!-- Set Offset Forms (Toggled) -->
-                <div id="offset-seconds-section" class="offset-input-section">
-                    <label for="offset-seconds" class="block text-gray-400 mb-2 text-sm sm:text-base">Set Offset in Seconds</label>
-                        <div class="flex flex-col sm:flex-row sm:space-x-4 space-y-2 sm:space-y-0">
-                            <input type="number" id="offset-seconds" 
-                            class="input flex-1" 
-                            step="0.01" placeholder="e.g., 1.5 or -0.2" aria-label="Offset in seconds">
-                        <button id="set-seconds-offset" class="btn btn-green whitespace-nowrap">
-                            Set Seconds
-                            </button>
-                    </div>
-                    <p class="text-gray-500 text-xs sm:text-sm mt-2">Positive value skips ahead, negative delays start.</p>
-                </div>
-                
-                <div id="offset-frames-section" class="offset-input-section hidden">
-                    <label for="offset-frames" class="block text-gray-400 mb-2 text-sm sm:text-base">Set Offset in Frames</label>
-                        <div class="flex flex-col sm:flex-row sm:space-x-4 space-y-2 sm:space-y-0">
-                            <input type="number" id="offset-frames" 
-                            class="input flex-1" 
-                            step="1" placeholder="e.g., 30 or -5" aria-label="Offset in frames">
-                            <input type="number" id="offset-fps" 
-                            class="input w-full sm:w-32" 
-                            step="0.01" value="30" placeholder="FPS (e.g. 30)" aria-label="Frames per second">
-                        <button id="set-frames-offset" class="btn btn-green whitespace-nowrap">
-                            Set Frames
-                            </button>
-                    </div>
-                    <p class="text-gray-500 text-xs sm:text-sm mt-2">Provide frames and the video's FPS for precise timing.</p>
-                </div>
-                
-                <p id="offset-feedback" class="text-sm mt-1 h-5"></p>
-            </div>
-        </div>
-        
         <!-- Port Configuration (Moved Down) -->
         <div class="card">
             <h2 class="card-header">Server Port Configuration</h2>
@@ -150,39 +88,6 @@
                 </div>
             </div>
         </div>
-
-
-        <!-- Controls -->
-        <div class="card">
-            <h2 class="card-header">Keyboard Controls (In Player Window)</h2>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm sm:text-base">
-                <div class="flex items-center space-x-3">
-                    <kbd class="keyboard-shortcut">SPACE</kbd>
-                    <span class="text-gray-300">Play/Pause</span>
-                </div>
-                <div class="flex items-center space-x-3">
-                    <kbd class="keyboard-shortcut">←</kbd> / <kbd class="keyboard-shortcut">→</kbd>
-                    <span class="text-gray-300">Seek ±5s</span>
-                </div>
-                <div class="flex items-center space-x-3">
-                    <kbd class="keyboard-shortcut">↑</kbd> / <kbd class="keyboard-shortcut">↓</kbd>
-                    <span class="text-gray-300">Volume ±5%</span>
-                </div>
-                <div class="flex items-center space-x-3">
-                    <kbd class="keyboard-shortcut">F</kbd>
-                    <span class="text-gray-300">Fullscreen</span>
-                </div>
-                <div class="flex items-center space-x-3">
-                    <kbd class="keyboard-shortcut">M</kbd>
-                    <span class="text-gray-300">Mute</span>
-                </div>
-                <p class="text-gray-400 col-span-full text-xs sm:text-sm">
-                    These are standard MPV controls. For more, see the 
-                    <a href="https://mpv.io/manual/master/" target="_blank" rel="noopener noreferrer" class="text-green-500 hover:underline">MPV manual</a>.
-                </p>
-            </div>
-        </div>
-
         <!-- Troubleshooting -->
         <div class="card">
             <h2 class="card-header">Troubleshooting</h2>
@@ -196,11 +101,11 @@
                 <p><span class="text-green-500 mr-1">•</span> To fully <span class="font-semibold">quit the application</span>, right-click the Alienor tray icon and select "Quit Alienor".</p>
             </div>
         </div>
-    </div>
-
-    <script>
-        let ws, reconnectAttempts = 0;
-        const MAX_RECONNECT_ATTEMPTS = 5, BASE_RECONNECT_DELAY = 1000;
+    </div>    <script>
+        let ws;
+        let reconnectAttempts = 0;
+        const MAX_RECONNECT_ATTEMPTS = 5;
+        const BASE_RECONNECT_DELAY = 1000;
         const { invoke } = window.__TAURI__.core;
 
         const serverStatusBadge = document.getElementById('server-status-badge');
@@ -208,35 +113,18 @@
         const titleElement = document.getElementById('title');
         const statusContainer = document.getElementById('status-container');
         const progressSection = document.getElementById('progress-section');
-        const currentOffsetElement = document.getElementById('current-offset');
-        const offsetActiveElement = document.getElementById('offset-active');
-        const offsetSecondsInput = document.getElementById('offset-seconds');
-        const offsetFramesInput = document.getElementById('offset-frames');
-        const offsetFpsInput = document.getElementById('offset-fps');
-        const setSecondsBtn = document.getElementById('set-seconds-offset');
-        const setFramesBtn = document.getElementById('set-frames-offset');
-        const resetOffsetBtn = document.getElementById('reset-offset');
-        const offsetFeedback = document.getElementById('offset-feedback');
+
         const setPortBtn = document.getElementById('set-port-button');
         const clearPortBtn = document.getElementById('clear-port-button');
         const newPortInput = document.getElementById('new-port');
         const portFeedback = document.getElementById('port-feedback');
         const configuredPortDisplay = document.getElementById('configured-port-display');
-        const offsetModeSecondsBtn = document.getElementById('offset-mode-seconds');
-        const offsetModeFramesBtn = document.getElementById('offset-mode-frames');
-        const offsetSecondsSection = document.getElementById('offset-seconds-section');
-        const offsetFramesSection = document.getElementById('offset-frames-section');
-        
-        let currentOffsetMode = 'seconds';
 
         const originalButtonText = {
-            [setSecondsBtn.id]: setSecondsBtn.textContent,
-            [setFramesBtn.id]: setFramesBtn.textContent,
-            [resetOffsetBtn.id]: resetOffsetBtn.textContent,
             [setPortBtn.id]: setPortBtn.textContent,
             [clearPortBtn.id]: clearPortBtn.textContent,
         };
-        
+
         function setButtonLoading(button, isLoading, loadingText = 'Processing...') {
             if (!button) return;
             button.disabled = isLoading;
@@ -254,7 +142,6 @@
             element.textContent = message;
             element.classList.remove('text-red-500', 'text-green-500');
             element.classList.add(isError ? 'text-red-500' : 'text-green-500');
-            element.classList.remove('opacity-0');
             if (duration > 0) {
                 setTimeout(() => {
                     element.textContent = '';
@@ -280,7 +167,7 @@
                     titleElement.textContent = 'Connected - Waiting for status...';
                     statusContainer.innerHTML = '<p class="col-span-full sm:col-span-2 text-gray-400">Waiting for first status update...</p>';
                     break;
-                case 'reconnecting':
+                case 'reconnecting': {
                     const delaySeconds = (BASE_RECONNECT_DELAY * Math.pow(2, attempt - 1) / 1000).toFixed(1);
                     serverStatusBadge.textContent = `Retrying (${attempt}/${MAX_RECONNECT_ATTEMPTS})...`;
                     serverStatusBadge.className = 'status-badge whitespace-nowrap transition-colors duration-300 bg-yellow-500';
@@ -289,6 +176,7 @@
                     titleElement.textContent = 'Connection Lost - Reconnecting...';
                     statusContainer.innerHTML = `<p class="col-span-full sm:col-span-2 text-yellow-400">Connection lost. Attempting reconnect ${attempt}/${MAX_RECONNECT_ATTEMPTS} in ${delaySeconds}s...</p>`;
                     break;
+                }
                 case 'disconnected':
                     serverStatusBadge.textContent = 'Player Disconnected';
                     serverStatusBadge.className = 'status-badge whitespace-nowrap transition-colors duration-300 bg-red-600';
@@ -302,83 +190,56 @@
         }
 
         function connectWebSocket() {
-            console.log("Attempting WebSocket connection...");
             updateUIForConnectionState('connecting');
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const host = window.location.host || `localhost:{current_port}`; 
+            const host = window.location.host || 'localhost:{current_port}';
             ws = new WebSocket(`${protocol}//${host}/ws`);
-            
+
             ws.onopen = () => {
-                console.log("WebSocket connected");
                 reconnectAttempts = 0;
                 updateUIForConnectionState('connected');
-                if (ws && ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({ command: 'getOffset' }));
-                }
             };
-            
+
             ws.onmessage = (event) => {
                 try {
                     const data = JSON.parse(event.data);
                     if (data.status === 'error') {
                         console.error(`Backend Error (${data.command || 'N/A'}):`, data.error);
-                        if (data.command === 'setOffset') {
-                            showFeedback(offsetFeedback, `Offset Error: ${data.error}`, true);
-                        } else {
-                             console.error("Unhandled backend error:", data);
-                        }
-                        setButtonLoading(setSecondsBtn, false);
-                        setButtonLoading(setFramesBtn, false);
                         return;
                     }
-                    if (data.command === 'offsetUpdated' || data.command === 'offsetStatus') {
-                        const offset = parseFloat(data.seconds);
-                        currentOffsetElement.textContent = offset.toFixed(2);
-                        offsetActiveElement.classList.toggle('hidden', Math.abs(offset) < 0.01);
-                        if (data.command === 'offsetUpdated') {
-                             showFeedback(offsetFeedback, `Offset set to ${offset.toFixed(2)}s`, false);
-                        }
-                        setButtonLoading(setSecondsBtn, false);
-                        setButtonLoading(setFramesBtn, false);
-                        setButtonLoading(resetOffsetBtn, false);
-                    } else {
-                        updateStatus(data);
-                    }
+                    updateStatus(data);
                 } catch (e) {
-                    console.error("Failed to parse WebSocket message:", event.data, e);
+                    console.error('Failed to parse WebSocket message:', event.data, e);
                 }
             };
-            
-            ws.onclose = (event) => {
-                console.log("WebSocket disconnected. Code:", event.code, "Reason:", event.reason);
+
+            ws.onclose = () => {
                 ws = null;
                 if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
                     reconnectAttempts++;
-                    console.log(`WebSocket reconnect attempt ${reconnectAttempts}...`);
                     updateUIForConnectionState('reconnecting', reconnectAttempts);
-                    const delay = BASE_RECONNECT_DELAY * Math.pow(2, reconnectAttempts -1);
+                    const delay = BASE_RECONNECT_DELAY * Math.pow(2, reconnectAttempts - 1);
                     setTimeout(connectWebSocket, Math.min(delay, 30000));
                 } else {
-                    console.error("WebSocket max reconnect attempts reached.");
                     updateUIForConnectionState('disconnected');
                 }
             };
-            
+
             ws.onerror = (error) => {
-                console.error("WebSocket error:", error);
+                console.error('WebSocket error:', error);
             };
         }
 
         function formatTime(seconds) {
             if (seconds === null || seconds === undefined || isNaN(seconds)) return '--:--';
-            seconds = Math.max(0, parseFloat(seconds));
-            const mins = Math.floor(seconds / 60);
-            const secs = Math.floor(seconds % 60);
+            const safe = Math.max(0, parseFloat(seconds));
+            const mins = Math.floor(safe / 60);
+            const secs = Math.floor(safe % 60);
             return `${mins}:${secs.toString().padStart(2, '0')}`;
         }
 
         function getStatusIndicatorClass(statusText) {
-            switch (statusText?.toLowerCase()) {
+            switch ((statusText || '').toLowerCase()) {
                 case 'playing': return 'bg-green-500';
                 case 'paused': return 'bg-yellow-500';
                 case 'idle': return 'bg-gray-500';
@@ -386,41 +247,10 @@
             }
         }
 
-        function updateCurrentOffsetDisplay(seconds) {
-            const fps = parseFloat(offsetFpsInput.value) || 30.0;
-            const frames = Math.round(seconds * fps);
-            const displayString = `${seconds.toFixed(2)}s (~${frames} frames @ ${fps.toFixed(1)} fps)`;
-            currentOffsetElement.textContent = displayString;
-            offsetActiveElement.classList.toggle('hidden', Math.abs(seconds) < 0.01);
-        }
-
-        let isSyncingOffsets = false;
-
         function updateStatus(status) {
             const playerStatusText = status.Status || (status.Idle ? 'Idle' : 'Unknown');
             titleElement.textContent = status.Title || (playerStatusText === 'Idle' ? 'Player Idle' : 'No Media Loaded');
             titleElement.classList.toggle('opacity-50', !status.Title);
-
-            let fpsChanged = false;
-            let currentFpsVal = parseFloat(offsetFpsInput.value);
-            if (typeof status.fps === 'number' && status.fps > 0) {
-                if (document.activeElement !== offsetFpsInput) {
-                    const newFps = status.fps.toFixed(3);
-                    if (offsetFpsInput.value !== newFps) {
-                        offsetFpsInput.value = newFps;
-                        fpsChanged = true;
-                    }
-                }
-            } else {
-                if (status.fps === null && document.activeElement !== offsetFpsInput && offsetFpsInput.value !== '30') {
-                     offsetFpsInput.value = '30';
-                     fpsChanged = true;
-                }
-            }
-            
-            if(fpsChanged) {
-                syncOffsetInputs('fps', offsetFpsInput.value, false);
-            }
 
             const position = status.Position;
             const duration = status.Duration;
@@ -441,156 +271,46 @@
 
             statusContainer.innerHTML = '';
             const displayOrder = ['Status', 'Speed', 'Volume', 'Loop'];
-            
+
             const statusDiv = document.createElement('div');
             statusDiv.className = 'flex items-center space-x-2';
             const statusDotClass = getStatusIndicatorClass(playerStatusText);
             statusDiv.innerHTML = `
-                <span class="text-green-500 min-w-[60px] inline-block font-medium">Status:</span> 
+                <span class="text-green-500 min-w-[60px] inline-block font-medium">Status:</span>
                 <span class="flex items-center">
                     <span class="w-2.5 h-2.5 ${statusDotClass} rounded-full mr-2 inline-block"></span>
                     <span>${playerStatusText}</span>
                 </span>`;
             statusContainer.appendChild(statusDiv);
 
-            displayOrder.slice(1).forEach(key => {
+            displayOrder.slice(1).forEach((key) => {
                 if (key in status && status[key] !== null) {
                     const itemDiv = document.createElement('div');
                     let value = status[key];
-                    let label = key;
                     if (key === 'Speed') value += 'x';
                     if (key === 'Volume') value = `${Math.round(value)}%`;
                     if (key === 'Loop') value = status[key] ? 'File' : 'Off';
-                    itemDiv.innerHTML = `<span class="text-gray-400 min-w-[60px] inline-block">${label}:</span> ${value}`;
+                    itemDiv.innerHTML = `<span class="text-gray-400 min-w-[60px] inline-block">${key}:</span> ${value}`;
                     statusContainer.appendChild(itemDiv);
                 }
             });
 
             if (status.Path) {
                 const pathDiv = document.createElement('div');
-                pathDiv.className = 'col-span-full sm:col-span-2'; 
+                pathDiv.className = 'col-span-full sm:col-span-2';
                 pathDiv.innerHTML = `<span class="text-gray-400 min-w-[60px] inline-block">Path:</span> <span class="text-gray-300 break-all text-xs">${status.Path}</span>`;
                 statusContainer.appendChild(pathDiv);
-            }
-
-            if ('Offset' in status && typeof status.Offset === 'number') {
-                 const offsetSeconds = parseFloat(status.Offset);
-                 if (!isNaN(offsetSeconds)) {
-                     updateCurrentOffsetDisplay(offsetSeconds);
-                     if (!isSyncingOffsets) {
-                         syncOffsetInputs('seconds', offsetSeconds, false);
-                     }
-                 }
-             }
-        }
-
-        function syncOffsetInputs(source, value, triggerSend = true) {
-            if (isSyncingOffsets) return;
-            isSyncingOffsets = true;
-
-            const fps = parseFloat(offsetFpsInput.value) || 30.0;
-            let seconds, frames;
-            let sendData = null;
-
-            try {
-                if (source === 'seconds') {
-                    seconds = parseFloat(value);
-                    if (!isNaN(seconds)) {
-                        frames = Math.round(seconds * fps);
-                        if (document.activeElement !== offsetFramesInput) {
-                             offsetFramesInput.value = frames;
-                             if (currentOffsetMode === 'frames') flashInputBg(offsetFramesInput);
-                        }
-                        if (document.activeElement !== offsetSecondsInput) {
-                             offsetSecondsInput.value = seconds.toFixed(3);
-                        }
-                        updateCurrentOffsetDisplay(seconds);
-                        if (triggerSend) sendData = { seconds };
-                    } else if (value === '' && document.activeElement === offsetSecondsInput) {
-                        if (document.activeElement !== offsetFramesInput) offsetFramesInput.value = '';
-                        updateCurrentOffsetDisplay(0);
-                    }
-                } else if (source === 'frames') {
-                    frames = parseInt(value);
-                    if (!isNaN(frames)) {
-                        seconds = frames / fps;
-                         if (document.activeElement !== offsetSecondsInput) {
-                            offsetSecondsInput.value = seconds.toFixed(3);
-                            if (currentOffsetMode === 'seconds') flashInputBg(offsetSecondsInput);
-                        }
-                         if (document.activeElement !== offsetFramesInput) {
-                             offsetFramesInput.value = frames;
-                        }
-                        updateCurrentOffsetDisplay(seconds);
-                       if (triggerSend) sendData = { frames, fps };
-                    } else if (value === '' && document.activeElement === offsetFramesInput) {
-                         if (document.activeElement !== offsetSecondsInput) offsetSecondsInput.value = '';
-                         updateCurrentOffsetDisplay(0);
-                    }
-                } else if (source === 'fps') {
-                     if (currentOffsetMode === 'seconds') {
-                        seconds = parseFloat(offsetSecondsInput.value);
-                        if (!isNaN(seconds)) {
-                            frames = Math.round(seconds * fps);
-                            if (document.activeElement !== offsetFramesInput) offsetFramesInput.value = frames;
-                            updateCurrentOffsetDisplay(seconds);
-                        }
-                     } else {
-                         frames = parseInt(offsetFramesInput.value);
-                         if (!isNaN(frames)){
-                            seconds = frames / fps;
-                             if (document.activeElement !== offsetSecondsInput) offsetSecondsInput.value = seconds.toFixed(3);
-                            updateCurrentOffsetDisplay(seconds);
-                        }
-                     }
-                }
-                
-                if (sendData) {
-                    sendOffsetCommand(sendData);
-                }
-            } catch (e) {
-                console.error("Error syncing offsets:", e);
-            } finally {
-                isSyncingOffsets = false;
-            }
-        }
-
-        function flashInputBg(inputElement) {
-             if (!inputElement) return;
-             inputElement.classList.add('bg-green-900/50');
-             setTimeout(() => {
-                 inputElement.classList.remove('bg-green-900/50');
-             }, 150);
-        }
-
-        function sendOffsetCommand(offsetData) {
-            const buttonsToDisable = [setSecondsBtn, setFramesBtn, resetOffsetBtn];
-            buttonsToDisable.forEach(btn => setButtonLoading(btn, true, 'Setting...'));
-            offsetFeedback.textContent = ''; 
-
-            const command = { command: 'setOffset', ...offsetData };
-            console.log("Sending offset command:", command);
-
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify(command));
-                setTimeout(() => {
-                     buttonsToDisable.forEach(btn => { if (btn.disabled) setButtonLoading(btn, false); });
-                }, 5000); 
-            } else {
-                console.warn("WebSocket not open, cannot send offset command via WS.");
-                showFeedback(offsetFeedback, "Error: WebSocket not connected.", true);
-                buttonsToDisable.forEach(btn => setButtonLoading(btn, false));
             }
         }
 
         function validatePortInput() {
-            const portVal = parseInt(newPortInput.value);
+            const portVal = parseInt(newPortInput.value, 10);
             const isValid = !isNaN(portVal) && portVal >= 1025 && portVal <= 65535;
-            
+
             if (newPortInput.value === '' || isValid) {
                 newPortInput.classList.remove('input-invalid');
                 setPortBtn.disabled = !isValid;
-                 if (newPortInput.value === '') setPortBtn.disabled = true;
+                if (newPortInput.value === '') setPortBtn.disabled = true;
                 portFeedback.textContent = '';
             } else {
                 newPortInput.classList.add('input-invalid');
@@ -599,97 +319,45 @@
             }
         }
 
-        function setOffsetMode(mode) {
-            currentOffsetMode = mode;
-            if (mode === 'seconds') {
-                offsetSecondsSection.classList.remove('hidden');
-                offsetFramesSection.classList.add('hidden');
-                offsetModeSecondsBtn.classList.add('active');
-                offsetModeFramesBtn.classList.remove('active');
-            } else {
-                 offsetSecondsSection.classList.add('hidden');
-                offsetFramesSection.classList.remove('hidden');
-                offsetModeSecondsBtn.classList.remove('active');
-                offsetModeFramesBtn.classList.add('active');
-            }
-        }
-
         document.addEventListener('DOMContentLoaded', () => {
-            console.log("DOM loaded.");
             connectWebSocket();
-
-            offsetSecondsInput.addEventListener('input', (e) => syncOffsetInputs('seconds', e.target.value));
-            offsetFramesInput.addEventListener('input', (e) => syncOffsetInputs('frames', e.target.value));
-            offsetFpsInput.addEventListener('input', (e) => syncOffsetInputs('fps', e.target.value, false));
-
-            setSecondsBtn.addEventListener('click', () => {
-                const seconds = parseFloat(offsetSecondsInput.value);
-                if (!isNaN(seconds)) {
-                    syncOffsetInputs('seconds', seconds, true);
-                } else {
-                    showFeedback(offsetFeedback, "Invalid number for seconds.", true);
-                }
-            });
-
-            setFramesBtn.addEventListener('click', () => {
-                const frames = parseInt(offsetFramesInput.value);
-                const fps = parseFloat(offsetFpsInput.value);
-                 if (isNaN(frames)) {
-                     showFeedback(offsetFeedback, "Invalid number for frames.", true);
-                 } else if (isNaN(fps) || fps <= 0) {
-                      showFeedback(offsetFeedback, "Invalid number for FPS (must be > 0).", true);
-                 } else {
-                     syncOffsetInputs('frames', frames, true);
-                 }
-            });
-
-            resetOffsetBtn.addEventListener('click', () => {
-                offsetSecondsInput.value = '0.0'; 
-                syncOffsetInputs('seconds', 0.0, true);
-                offsetSecondsInput.value = '';
-                offsetFramesInput.value = '';
-            });
 
             newPortInput.addEventListener('input', validatePortInput);
             validatePortInput();
 
             setPortBtn.addEventListener('click', async () => {
                 portFeedback.textContent = '';
-                 const newPortVal = parseInt(newPortInput.value); 
+                const newPortVal = parseInt(newPortInput.value, 10);
                 const buttonsToDisable = [setPortBtn, clearPortBtn];
-                buttonsToDisable.forEach(btn => setButtonLoading(btn, true, 'Restarting...'));
+                buttonsToDisable.forEach((btn) => setButtonLoading(btn, true, 'Restarting...'));
 
                 try {
                     await invoke('set_port_and_restart', { newPort: newPortVal });
-                    showFeedback(portFeedback, 'Restart initiated. App will close.', false, 0); 
+                    showFeedback(portFeedback, 'Restart initiated. App will close.', false, 0);
                 } catch (error) {
-                    console.error("Failed to set port and restart:", error);
+                    console.error('Failed to set port and restart:', error);
                     showFeedback(portFeedback, `Error: ${error}`, true, 0);
-                    buttonsToDisable.forEach(btn => setButtonLoading(btn, false));
+                    buttonsToDisable.forEach((btn) => setButtonLoading(btn, false));
                 }
             });
 
             clearPortBtn.addEventListener('click', async () => {
                 portFeedback.textContent = '';
-                const buttonsToDisable = [setPortBtn, clearPortBtn];
-                setButtonLoading(clearPortBtn, true, 'Clearing...'); 
+                setButtonLoading(clearPortBtn, true, 'Clearing...');
 
                 try {
                     await invoke('clear_saved_port');
                     showFeedback(portFeedback, 'Saved port cleared. Auto-detect (Default: 3000) on next launch.', false);
-                    configuredPortDisplay.textContent = "Auto (Default: 3000)";
+                    configuredPortDisplay.textContent = 'Auto (Default: 3000)';
                     newPortInput.value = '';
                 } catch (error) {
-                    console.error("Failed to clear saved port:", error);
+                    console.error('Failed to clear saved port:', error);
                     showFeedback(portFeedback, `Error: ${error}`, true);
                 }
-                setButtonLoading(clearPortBtn, false); 
+
+                setButtonLoading(clearPortBtn, false);
                 setButtonLoading(setPortBtn, false);
             });
-
-            offsetModeSecondsBtn.addEventListener('click', () => setOffsetMode('seconds'));
-            offsetModeFramesBtn.addEventListener('click', () => setOffsetMode('frames'));
-            setOffsetMode('seconds');
         });
     </script>
 </body>

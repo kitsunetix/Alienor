@@ -7,9 +7,9 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        'alien-blue': '#0088CC',
-        'alien-gray': '#1E1E1E',
-        'alien-green': '#4CAF50',
+        'alienor-blue': '#0088CC',
+        'alienor-gray': '#1E1E1E',
+        'alienor-green': '#4CAF50',
         'red-700': '#B91C1C',
         'blue-700': '#1D4ED8',
       },

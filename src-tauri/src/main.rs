@@ -34,7 +34,8 @@ use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::ServeDir;
 
 // --- Configuration Handling ---
-const CONFIG_FILE_NAME: &str = "alien_config.json";
+const CONFIG_FILE_NAME: &str = "alienor_config.json";
+const LEGACY_CONFIG_FILE_NAME: &str = "alien_config.json";
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct AppConfig {
@@ -59,36 +60,63 @@ fn get_config_path(app_handle: &AppHandle) -> std::io::Result<PathBuf> {
     Ok(config_dir.join(CONFIG_FILE_NAME))
 }
 
+fn get_legacy_config_path(app_handle: &AppHandle) -> std::io::Result<PathBuf> {
+    let config_dir = app_handle.path().app_config_dir().map_err(|e| {
+        std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            format!("App config directory not found: {}", e),
+        )
+    })?;
+    Ok(config_dir.join(LEGACY_CONFIG_FILE_NAME))
+}
+
 fn load_config(app_handle: &AppHandle) -> AppConfig {
     match get_config_path(app_handle) {
         Ok(path) => {
-            if path.exists() {
-                match File::open(&path) {
+            let legacy_path = get_legacy_config_path(app_handle).ok();
+            let load_path = if path.exists() {
+                path
+            } else if let Some(legacy) = legacy_path {
+                if legacy.exists() {
+                    println!("Using legacy config path: {:?}", legacy);
+                    legacy
+                } else {
+                    path
+                }
+            } else {
+                path
+            };
+
+            if load_path.exists() {
+                match File::open(&load_path) {
                     Ok(mut file) => {
                         let mut contents = String::new();
                         if file.read_to_string(&mut contents).is_ok() {
                             match serde_json::from_str(&contents) {
                                 Ok(config) => {
-                                    println!("Loaded config from {:?}: {:?}", path, config);
+                                    println!("Loaded config from {:?}: {:?}", load_path, config);
                                     config
                                 }
                                 Err(e) => {
                                     eprintln!(
                                         "Failed to parse config file {:?}: {}. Using default.",
-                                        path, e
+                                        load_path, e
                                     );
                                     AppConfig::default()
                                 }
                             }
                         } else {
-                            eprintln!("Failed to read config file {:?}. Using default.", path);
+                            eprintln!(
+                                "Failed to read config file {:?}. Using default.",
+                                load_path
+                            );
                             AppConfig::default()
                         }
                     }
                     Err(e) => {
                         eprintln!(
                             "Failed to open config file {:?}: {}. Using default.",
-                            path, e
+                            load_path, e
                         );
                         AppConfig::default()
                     }
