@@ -72,3 +72,54 @@ impl CommandRequest {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::CommandRequest;
+    use serde_json::json;
+
+    #[test]
+    fn parses_seek_request() {
+        match CommandRequest::from_json(&json!({
+            "command": "seek",
+            "position": 12.5
+        })) {
+            Some(CommandRequest::Seek(position)) => assert_eq!(position, 12.5),
+            _ => panic!("expected seek request"),
+        }
+    }
+
+    #[test]
+    fn rejects_seek_without_position() {
+        match CommandRequest::from_json(&json!({ "command": "seek" })) {
+            Some(CommandRequest::Invalid { command, message }) => {
+                assert_eq!(command, "seek");
+                assert_eq!(message, "Missing or invalid 'position' field");
+            }
+            _ => panic!("expected invalid seek request"),
+        }
+    }
+
+    #[test]
+    fn parses_frame_offset_with_default_fps() {
+        match CommandRequest::from_json(&json!({
+            "command": "setOffset",
+            "frames": 30
+        })) {
+            Some(CommandRequest::SetOffset {
+                seconds: None,
+                frames: Some(30),
+                fps,
+            }) => assert_eq!(fps, 30.0),
+            _ => panic!("expected frame offset request"),
+        }
+    }
+
+    #[test]
+    fn preserves_unknown_command_name() {
+        match CommandRequest::from_json(&json!({ "command": "futureCommand" })) {
+            Some(CommandRequest::Unknown(command)) => assert_eq!(command, "futureCommand"),
+            _ => panic!("expected unknown command"),
+        }
+    }
+}
