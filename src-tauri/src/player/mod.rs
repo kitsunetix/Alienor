@@ -4,6 +4,7 @@
 //! is still backed by the legacy `mpv` module for now so the migration can be
 //! done incrementally without changing runtime behaviour.
 
+mod commands;
 mod error;
 mod properties;
 mod state;
