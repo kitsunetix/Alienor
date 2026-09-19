@@ -211,42 +211,6 @@ async fn status_page(
     Ok(Html(html))
 }
 
-// New endpoints for loop control
-async fn set_loop(
-    AxumState(state): AxumState<Arc<AppState>>,
-    Json(payload): Json<serde_json::Value>,
-) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    // Get loop setting from payload
-    let enabled = payload.get("enabled").and_then(|v| v.as_bool()).ok_or((
-        StatusCode::BAD_REQUEST,
-        "Missing or invalid 'enabled' field".to_string(),
-    ))?;
-
-    state
-        .player
-        .set_loop(enabled)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-
-    Ok(Json(json!({
-        "status": "success",
-        "loop_enabled": enabled
-    })))
-}
-
-async fn get_loop(
-    AxumState(state): AxumState<Arc<AppState>>,
-) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    let loop_enabled = state
-        .player
-        .get_loop()
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-
-    Ok(Json(json!({
-        "status": "success",
-        "loop_enabled": loop_enabled
-    })))
-}
-
 // --- Start: Restore find_templates_dir helper ---
 fn find_templates_dir() -> PathBuf {
     // Executable directory
@@ -357,7 +321,7 @@ async fn main() {
                 .route("/sync", post(http_misc::sync))
                 .route("/playback/time", get(http_playback::get_playback_time).post(http_playback::set_playback_time))
                 .route("/playback/offset", get(http_playback::get_offset).post(http_playback::set_offset))
-                .route("/playback/loop", get(get_loop).post(set_loop))
+                .route("/playback/loop", get(http_playback::get_loop).post(http_playback::set_loop))
                 .route("/status", get(http_playback::get_connection_status))
                 .route("/", get(status_page))
                 .nest_service("/static", ServeDir::new(static_path))

@@ -179,3 +179,37 @@ pub(crate) async fn get_offset(
         "offset_seconds": state.player.get_offset_seconds()
     })))
 }
+
+pub(crate) async fn set_loop(
+    AxumState(state): AxumState<Arc<AppState>>,
+    Json(payload): Json<serde_json::Value>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    let enabled = payload.get("enabled").and_then(|value| value.as_bool()).ok_or((
+        StatusCode::BAD_REQUEST,
+        "Missing or invalid 'enabled' field".to_string(),
+    ))?;
+
+    state
+        .player
+        .set_loop(enabled)
+        .map_err(|error| (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?;
+
+    Ok(Json(json!({
+        "status": "success",
+        "loop_enabled": enabled
+    })))
+}
+
+pub(crate) async fn get_loop(
+    AxumState(state): AxumState<Arc<AppState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    let loop_enabled = state
+        .player
+        .get_loop()
+        .map_err(|error| (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?;
+
+    Ok(Json(json!({
+        "status": "success",
+        "loop_enabled": loop_enabled
+    })))
+}
