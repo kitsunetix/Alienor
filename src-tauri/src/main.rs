@@ -305,44 +305,6 @@ async fn set_playback_time(
     }
 }
 
-async fn get_connection_status(
-    AxumState(state): AxumState<Arc<AppState>>,
-) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    // Get player status
-    let status = state
-        .player
-        .get_status()
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-
-    // Extract status values with default fallbacks
-    let get_str = |key: &str| status.get(key).and_then(|v| v.as_str()).unwrap_or("");
-    let get_f64 = |key: &str| status.get(key).and_then(|v| v.as_f64()).unwrap_or(0.0);
-
-    let eof_reached = get_str("EndOfFile") == "yes";
-    let is_idle = get_str("Idle") == "yes";
-    // Check Status property for play/pause state as reported by get_status
-    let is_paused = get_str("Status") == "Paused";
-    let duration = get_f64("Duration");
-    // Use the adjusted position reported by get_status
-    let position = get_f64("Position");
-
-    // Player is playing if not paused, not at EOF, and not idle
-    let is_playing = !is_paused && !eof_reached && !is_idle;
-
-    Ok(Json(json!({
-        "connected": true,
-        "playing": is_playing,
-        "port": state.port,
-        "timestamp": chrono::Utc::now().timestamp_millis(),
-        "eof": eof_reached,
-        "idle": is_idle,
-        "duration": duration,
-        "position": position,
-        "paused": is_paused, // Add explicit paused state
-        "offset": state.player.get_offset_seconds() // Add current offset
-    })))
-}
-
 // Add these handlers for offset functionality
 async fn set_offset(
     AxumState(state): AxumState<Arc<AppState>>,
@@ -542,7 +504,7 @@ async fn main() {
                 .route("/playback/time", get(http_playback::get_playback_time).post(set_playback_time))
                 .route("/playback/offset", get(get_offset).post(set_offset))
                 .route("/playback/loop", get(get_loop).post(set_loop))
-                .route("/status", get(get_connection_status))
+                .route("/status", get(http_playback::get_connection_status))
                 .route("/", get(status_page))
                 .nest_service("/static", ServeDir::new(static_path))
                 .layer(CorsLayer::new().allow_origin(Any).allow_methods(Any).allow_headers(Any))
