@@ -10,6 +10,7 @@ mod ws_handlers;
 mod ws_config;
 mod ws_server;
 mod http_misc;
+mod http_playback;
 
 use axum::{
     extract::{Path, State as AxumState},
@@ -211,26 +212,6 @@ async fn status_page(
 }
 
 // Add new API endpoints for Roblox sync
-async fn get_playback_time(
-    axum::extract::State(state): axum::extract::State<Arc<AppState>>,
-) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    let handle = state
-        .player
-        .get_handle()
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-    let time = handle
-        .get_property::<f64>("time-pos")
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-    let duration = handle
-        .get_property::<f64>("duration")
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-
-    Ok(Json(json!({
-        "time": time,
-        "duration": duration
-    })))
-}
-
 async fn set_playback_time(
     AxumState(state): AxumState<Arc<AppState>>,
     Json(payload): Json<serde_json::Value>,
@@ -558,7 +539,7 @@ async fn main() {
                 .route("/control/:action", post(control_player))
                 .route("/room/:id", get(http_misc::room_status))
                 .route("/sync", post(http_misc::sync))
-                .route("/playback/time", get(get_playback_time).post(set_playback_time))
+                .route("/playback/time", get(http_playback::get_playback_time).post(set_playback_time))
                 .route("/playback/offset", get(get_offset).post(set_offset))
                 .route("/playback/loop", get(get_loop).post(set_loop))
                 .route("/status", get(get_connection_status))
