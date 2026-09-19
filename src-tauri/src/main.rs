@@ -4,16 +4,7 @@
 mod player;
 mod app_config;
 mod app_state;
-mod ws_protocol;
-mod ws_commands;
-mod ws_handlers;
-mod ws_config;
-mod ws_server;
-mod http_misc;
-mod http_playback;
-mod http_pages;
-mod http_control;
-mod http_server;
+mod server;
 mod server_config;
 mod player_monitor;
 
@@ -21,7 +12,7 @@ use axum::extract::State as AxumState;
 use player::MpvPlayer;
 use app_config::{load_config, save_config, AppConfig};
 use app_state::AppState;
-use http_misc::sync_room;
+use server::http::misc::sync_room;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::io::ErrorKind;
@@ -159,11 +150,11 @@ async fn main() {
             app.manage(app_state.clone());
 
             // --- Start Axum Server ---
-            let static_path = http_pages::find_templates_dir();
+            let static_path = server::http::pages::find_templates_dir();
             println!("Axum will serve static files from: {:?}", static_path);
 
-            let axum_app = http_server::router(app_state.clone(), static_path);
-            tokio::spawn(http_server::serve(port, axum_app));
+            let axum_app = server::router(app_state.clone(), static_path);
+            tokio::spawn(server::serve(port, axum_app));
 
             // --- Create Tray Menu (Using Builder Pattern) ---
             let quit_item = MenuItemBuilder::new("Quit Alienor")

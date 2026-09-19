@@ -4,8 +4,8 @@ use std::sync::Arc;
 
 use crate::app_state::AppState;
 use crate::player::Error as PlayerError;
-use crate::ws_commands::CommandRequest;
-use crate::ws_protocol::send_error;
+use super::commands::CommandRequest;
+use super::protocol::send_error;
 
 pub(crate) async fn handle_command(
     command: CommandRequest,

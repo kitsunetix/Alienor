@@ -7,12 +7,12 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::time::{interval, sleep, Instant, MissedTickBehavior};
 
 use crate::app_state::AppState;
-use crate::ws_commands::CommandRequest;
-use crate::ws_config::{
+use super::commands::CommandRequest;
+use super::config::{
     ERROR_BACKOFF, MAX_CONSECUTIVE_ERRORS, MIN_STATUS_INTERVAL, PAUSED_STATUS_INTERVAL,
     PING_INTERVAL, PING_TIMEOUT, PLAYING_STATUS_INTERVAL,
 };
-use crate::ws_handlers::handle_command;
+use super::handlers::handle_command;
 
 const RELEVANT_STATUS_KEYS: &[&str] = &[
     "Status", "Position", "Duration", "Path", "Title", "Loop", "Offset", "EndOfFile", "Idle",
