@@ -3,6 +3,7 @@
 
 mod player;
 mod app_config;
+mod app_state;
 
 use axum::{
     extract::{Path, State as AxumState, WebSocketUpgrade},
@@ -13,6 +14,7 @@ use axum::{
 };
 use player::{Error as PlayerError, MpvPlayer};
 use app_config::{load_config, save_config, AppConfig};
+use app_state::AppState;
 use once_cell::sync::Lazy;
 use portpicker::pick_unused_port;
 use serde::{Deserialize, Serialize};
@@ -32,13 +34,6 @@ use tauri::{
 use tokio::time::{interval, MissedTickBehavior};
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::ServeDir;
-
-struct AppState {
-    player: Arc<MpvPlayer>,
-    port: u16,
-    last_seek: Arc<AtomicU64>,                  // Track last seek time
-    config: Arc<tokio::sync::Mutex<AppConfig>>, // Add config to AppState
-}
 
 #[tauri::command]
 async fn sync_room(room_id: String) -> Result<String, String> {
