@@ -12,6 +12,7 @@ mod ws_server;
 mod http_misc;
 mod http_playback;
 mod http_pages;
+mod http_control;
 
 use axum::{
     extract::{Path, State as AxumState},
@@ -129,62 +130,6 @@ async fn clear_saved_port(
     Ok(())
 }
 
-async fn control_player(
-    axum::extract::State(state): axum::extract::State<Arc<AppState>>,
-    Path(action): Path<String>,
-) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    let cmd_result = match action.as_str() {
-        "play" => {
-            // First check if player is paused
-            let handle = state
-                .player
-                .get_handle()
-                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-            let is_paused = handle.get_property::<bool>("pause").unwrap_or(false);
-
-            if is_paused {
-                // Use direct set_property with bool value for better compatibility
-                handle
-                    .set_property("pause", false)
-                    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-                Ok(())
-            } else {
-                // Already playing, just return success
-                Ok(())
-            }
-        }
-        "pause" => {
-            // First check if player is playing
-            let handle = state
-                .player
-                .get_handle()
-                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-            let is_paused = handle.get_property::<bool>("pause").unwrap_or(false);
-
-            if !is_paused {
-                // Use direct set_property with bool value for better compatibility
-                handle
-                    .set_property("pause", true)
-                    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-                Ok(())
-            } else {
-                // Already paused, just return success
-                Ok(())
-            }
-        }
-        "stop" => state.player.command("stop", &[]),
-        "volume_up" => state.player.command("add", &["volume", "5"]),
-        "volume_down" => state.player.command("add", &["volume", "-5"]),
-        "seek_forward" => state.player.command("seek", &["10"]),
-        "seek_backward" => state.player.command("seek", &["-10"]),
-        _ => return Err((StatusCode::BAD_REQUEST, "Invalid action".to_string())),
-    };
-
-    cmd_result
-        .map(|_| Json(json!({ "status": "success", "action": action })))
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
-}
-
 #[tokio::main]
 async fn main() {
     tauri::Builder::default()
@@ -247,7 +192,7 @@ async fn main() {
 
             let axum_app = Router::new()
                 .route("/ws", get(ws_server::handler))
-                .route("/control/:action", post(control_player))
+                .route("/control/:action", post(http_control::control_player))
                 .route("/room/:id", get(http_misc::room_status))
                 .route("/sync", post(http_misc::sync))
                 .route("/playback/time", get(http_playback::get_playback_time).post(http_playback::set_playback_time))
