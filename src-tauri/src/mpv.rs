@@ -1,43 +1,10 @@
-use libmpv2::{events::Event, Error as LibMpvError, Mpv};
+use libmpv2::{events::Event, Mpv};
 use serde_json::{self, json, Value as JsonValue};
-use std::fmt;
 use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 use std::sync::mpsc;
 use std::sync::Arc;
 use std::sync::Mutex;
-use std::sync::PoisonError;
-
-#[derive(Debug)]
-#[allow(dead_code)]
-pub enum Error {
-    InitError(String),
-    PropertyError(String, i32),
-    CommandError(String, i32),
-    MutexError(String),
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Error::InitError(msg) => write!(f, "Initialization error: {}", msg),
-            Error::PropertyError(msg, code) => write!(f, "Property error ({}): {}", code, msg),
-            Error::CommandError(msg, code) => write!(f, "Command error ({}): {}", code, msg),
-            Error::MutexError(msg) => write!(f, "Mutex lock error: {}", msg),
-        }
-    }
-}
-
-impl<T> From<PoisonError<T>> for Error {
-    fn from(err: PoisonError<T>) -> Self {
-        Error::MutexError(format!("Mutex was poisoned: {}", err))
-    }
-}
-
-impl From<LibMpvError> for Error {
-    fn from(err: LibMpvError) -> Self {
-        Error::PropertyError(err.to_string(), -1)
-    }
-}
+use super::error::Error;
 
 pub struct MpvPlayer {
     handle: Arc<Mutex<Mpv>>,
