@@ -1,4 +1,5 @@
 use std::sync::atomic::Ordering;
+use serde_json::{self, json, Value as JsonValue};
 
 use super::error::Error;
 use super::state::MpvPlayer;
@@ -45,5 +46,54 @@ impl MpvPlayer {
         } else {
             Some(millis as f64 / 1000.0)
         }
+    }
+
+    pub fn get_status(&self) -> Result<JsonValue, Error> {
+        let handle = self.handle.lock()?;
+
+        let time_pos_opt = handle.get_property::<f64>("time-pos").ok();
+        let duration_opt = handle.get_property::<f64>("duration").ok();
+        let path_opt = handle.get_property::<String>("path").ok();
+        let volume_opt = handle.get_property::<f64>("volume").ok();
+        let speed_opt = handle.get_property::<f64>("speed").ok();
+        let loop_file_opt = handle.get_property::<String>("loop-file").ok();
+        let pause_opt = handle.get_property::<bool>("pause").ok();
+        let eof_reached_opt = handle.get_property::<String>("eof-reached").ok();
+        let idle_active_opt = handle.get_property::<bool>("idle-active").ok();
+        let media_title_opt = handle.get_property::<String>("media-title").ok();
+
+        let fps_opt = handle
+            .get_property::<f64>("container-fps")
+            .or_else(|_| handle.get_property::<f64>("estimated-vf-fps"))
+            .ok();
+
+        let is_idle = idle_active_opt.unwrap_or(path_opt.is_none());
+        let is_paused = pause_opt.unwrap_or(is_idle);
+        let status_str = if is_idle {
+            "Idle".to_string()
+        } else if is_paused {
+            "Paused".to_string()
+        } else {
+            "Playing".to_string()
+        };
+
+        let current_offset = self.get_offset_seconds();
+        let adjusted_time_pos = time_pos_opt.map(|time| time - current_offset);
+
+        Ok(json!({
+            "Status": status_str,
+            "Position": adjusted_time_pos,
+            "Elapsed": adjusted_time_pos,
+            "Duration": duration_opt,
+            "Path": path_opt,
+            "Title": media_title_opt.or(path_opt),
+            "Volume": volume_opt.map(|volume| volume.round()),
+            "Speed": speed_opt,
+            "Loop": loop_file_opt.map_or(false, |loop_state| loop_state == "inf" || loop_state == "yes"),
+            "Offset": current_offset,
+            "EndOfFile": eof_reached_opt,
+            "Idle": is_idle,
+            "fps": fps_opt,
+        }))
     }
 }

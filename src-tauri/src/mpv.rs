@@ -1,5 +1,4 @@
 use libmpv2::Mpv;
-use serde_json::{self, json, Value as JsonValue};
 use std::sync::atomic::{AtomicBool, AtomicI64};
 use std::sync::mpsc;
 use std::sync::Arc;
@@ -127,64 +126,6 @@ impl MpvPlayer {
             },
             exit_receiver,
         ))
-    }
-
-    pub fn get_status(&self) -> Result<JsonValue, Error> {
-        let handle = self.handle.lock()?;
-
-        // Get essential properties, handling errors gracefully
-        let time_pos_opt = handle.get_property::<f64>("time-pos").ok();
-        let duration_opt = handle.get_property::<f64>("duration").ok();
-        let path_opt = handle.get_property::<String>("path").ok();
-        let volume_opt = handle.get_property::<f64>("volume").ok();
-        let speed_opt = handle.get_property::<f64>("speed").ok();
-        let loop_file_opt = handle.get_property::<String>("loop-file").ok(); // e.g., "no", "inf"
-        let pause_opt = handle.get_property::<bool>("pause").ok();
-        let eof_reached_opt = handle.get_property::<String>("eof-reached").ok();
-        let idle_active_opt = handle.get_property::<bool>("idle-active").ok();
-        let media_title_opt = handle.get_property::<String>("media-title").ok();
-
-        // --- Get FPS ---
-        let fps_opt = handle
-            .get_property::<f64>("container-fps")
-            .or_else(|_| handle.get_property::<f64>("estimated-vf-fps")) // Fallback
-            .ok(); // Store as Option<f64>
-                   // --- End Get FPS ---
-
-        // Determine overall status string and handle potential None values
-        let is_idle = idle_active_opt.unwrap_or(path_opt.is_none()); // Idle if explicit or no path
-        let is_paused = pause_opt.unwrap_or(is_idle); // Paused if explicit or idle
-
-        let status_str = if is_idle {
-            "Idle".to_string()
-        } else if is_paused {
-            "Paused".to_string()
-        } else {
-            "Playing".to_string()
-        };
-
-        // Get the current playback offset (in seconds)
-        let current_offset = self.get_offset_seconds();
-
-        // Adjust the reported time position by subtracting the offset
-        let adjusted_time_pos = time_pos_opt.map(|t| t - current_offset);
-
-        // Build the JSON, handling Option types with json! macro support
-        Ok(json!({
-            "Status": status_str,
-            "Position": adjusted_time_pos,
-            "Elapsed": adjusted_time_pos, // Legacy field
-            "Duration": duration_opt,
-            "Path": path_opt,
-            "Title": media_title_opt.or(path_opt), // Use path as fallback title
-            "Volume": volume_opt.map(|v| v.round()),
-            "Speed": speed_opt,
-            "Loop": loop_file_opt.map_or(false, |l| l == "inf" || l == "yes"),
-            "Offset": current_offset,
-            "EndOfFile": eof_reached_opt, // Send Option<String> directly
-            "Idle": is_idle, // Send bool directly
-            "fps": fps_opt, // Add Option<f64> directly
-        }))
     }
 
     pub fn get_handle(&self) -> Result<std::sync::MutexGuard<'_, Mpv>, Error> {
