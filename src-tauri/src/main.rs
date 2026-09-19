@@ -211,100 +211,6 @@ async fn status_page(
     Ok(Html(html))
 }
 
-// Add new API endpoints for Roblox sync
-async fn set_playback_time(
-    AxumState(state): AxumState<Arc<AppState>>,
-    Json(payload): Json<serde_json::Value>,
-) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    const MIN_SEEK_INTERVAL: u64 = 16;
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis() as u64;
-
-    // Get time from payload (store for file-load auto-seek)
-    let time = payload["time"].as_f64().ok_or((
-        StatusCode::BAD_REQUEST,
-        "Missing or invalid 'time' field".to_string(),
-    ))?;
-    state.player.set_last_moon_time_seconds(time);
-
-    // --- Explicit Idle Check First ---
-    match state.player.get_handle() {
-        Ok(handle) => {
-            // Check if a path is loaded. If get_property fails, assume idle.
-            if handle.get_property::<String>("path").is_err() {
-                println!(
-                    "HTTP seek: Player is idle (no path property), ignoring seek request to {}.",
-                    time
-                );
-                return Ok(Json(json!({
-                            "status": "success",
-                            "ignored": true,
-                            "reason": "Player is idle (no media loaded)",
-                            "time": time, // Include requested time in response
-                            "timestamp": now
-                })));
-            }
-            // If path exists, proceed with the seek logic
-        }
-        Err(e) => {
-            // Failed to get handle, this is a more significant error
-            return Err((
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Failed to get MPV handle: {}", e),
-            ));
-        }
-    }
-    // --- End Idle Check ---
-
-    // Rate limit check (only apply if not idle)
-    if now - state.last_seek.load(Ordering::Relaxed) < MIN_SEEK_INTERVAL {
-        return Ok(Json(
-            json!({ "status": "rate_limited", "message": "Too many seek requests" }),
-        ));
-    }
-
-    // Get offset
-    let offset = state.player.get_offset_seconds();
-    let adjusted_time = time + offset;
-
-    // Attempt seek command (should succeed if we passed the idle check)
-    println!(
-        "HTTP seek: Attempting seek to {} (adjusted from {} with offset {})",
-        adjusted_time, time, offset
-    );
-    match state
-        .player
-        .command("seek", &[&adjusted_time.to_string(), "absolute", "exact"])
-    {
-        Ok(_) => {
-            // Seek succeeded
-            state.last_seek.store(now, Ordering::Relaxed);
-            Ok(Json(json!({
-                "status": "success",
-                "ignored": false,
-                "time": time,
-                "adjusted_time": adjusted_time,
-                "offset": offset,
-                "timestamp": now
-            })))
-        }
-        Err(e) => {
-            // If seek fails even after the idle check, it's an unexpected error
-            let error_string = e.to_string();
-            eprintln!(
-                "Error executing MPV seek command even after idle check: {}",
-                error_string
-            );
-            Err((
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Seek command failed unexpectedly: {}", error_string),
-            ))
-        }
-    }
-}
-
 // Add these handlers for offset functionality
 async fn set_offset(
     AxumState(state): AxumState<Arc<AppState>>,
@@ -501,7 +407,7 @@ async fn main() {
                 .route("/control/:action", post(control_player))
                 .route("/room/:id", get(http_misc::room_status))
                 .route("/sync", post(http_misc::sync))
-                .route("/playback/time", get(http_playback::get_playback_time).post(set_playback_time))
+                .route("/playback/time", get(http_playback::get_playback_time).post(http_playback::set_playback_time))
                 .route("/playback/offset", get(get_offset).post(set_offset))
                 .route("/playback/loop", get(get_loop).post(set_loop))
                 .route("/status", get(http_playback::get_connection_status))

@@ -1,5 +1,6 @@
 use axum::{extract::State as AxumState, http::StatusCode, response::Json};
 use serde_json::json;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 use crate::app_state::AppState;
@@ -54,4 +55,87 @@ pub(crate) async fn get_connection_status(
         "paused": is_paused,
         "offset": state.player.get_offset_seconds()
     })))
+}
+
+pub(crate) async fn set_playback_time(
+    AxumState(state): AxumState<Arc<AppState>>,
+    Json(payload): Json<serde_json::Value>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    const MIN_SEEK_INTERVAL: u64 = 16;
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64;
+
+    let time = payload["time"].as_f64().ok_or((
+        StatusCode::BAD_REQUEST,
+        "Missing or invalid 'time' field".to_string(),
+    ))?;
+    state.player.set_last_moon_time_seconds(time);
+
+    match state.player.get_handle() {
+        Ok(handle) => {
+            if handle.get_property::<String>("path").is_err() {
+                println!(
+                    "HTTP seek: Player is idle (no path property), ignoring seek request to {}.",
+                    time
+                );
+                return Ok(Json(json!({
+                    "status": "success",
+                    "ignored": true,
+                    "reason": "Player is idle (no media loaded)",
+                    "time": time,
+                    "timestamp": now
+                })));
+            }
+        }
+        Err(error) => {
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to get MPV handle: {}", error),
+            ));
+        }
+    }
+
+    if now - state.last_seek.load(Ordering::Relaxed) < MIN_SEEK_INTERVAL {
+        return Ok(Json(json!({
+            "status": "rate_limited",
+            "message": "Too many seek requests"
+        })));
+    }
+
+    let offset = state.player.get_offset_seconds();
+    let adjusted_time = time + offset;
+    println!(
+        "HTTP seek: Attempting seek to {} (adjusted from {} with offset {})",
+        adjusted_time, time, offset
+    );
+
+    match state
+        .player
+        .command("seek", &[&adjusted_time.to_string(), "absolute", "exact"])
+    {
+        Ok(_) => {
+            state.last_seek.store(now, Ordering::Relaxed);
+            Ok(Json(json!({
+                "status": "success",
+                "ignored": false,
+                "time": time,
+                "adjusted_time": adjusted_time,
+                "offset": offset,
+                "timestamp": now
+            })))
+        }
+        Err(error) => {
+            let error_string = error.to_string();
+            eprintln!(
+                "Error executing MPV seek command even after idle check: {}",
+                error_string
+            );
+            Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Seek command failed unexpectedly: {}", error_string),
+            ))
+        }
+    }
 }
