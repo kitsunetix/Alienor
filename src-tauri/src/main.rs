@@ -1,7 +1,7 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod mpv;
+mod player;
 
 use axum::{
     extract::{Path, State as AxumState, WebSocketUpgrade},
@@ -10,7 +10,7 @@ use axum::{
     routing::{get, post},
     Router,
 };
-use mpv::MpvPlayer;
+use player::{Error as PlayerError, MpvPlayer};
 use once_cell::sync::Lazy;
 use portpicker::pick_unused_port;
 use serde::{Deserialize, Serialize};
@@ -448,7 +448,7 @@ async fn handle_socket(mut socket: axum::extract::ws::WebSocket, state: Arc<AppS
                                         }
                                     },
                                     "setOffset" => {
-                                        let mut offset_result: Result<f64, mpv::Error> = Err(mpv::Error::CommandError("Invalid offset parameters".to_string(), -1));
+                                        let mut offset_result: Result<f64, PlayerError> = Err(PlayerError::CommandError("Invalid offset parameters".to_string(), -1));
                                         let mut update_type = "seconds"; // For response message
                                         let mut original_value: f64 = 0.0;
                                         let mut fps_value: f64 = 30.0;

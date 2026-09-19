@@ -7,6 +7,7 @@
 mod commands;
 mod error;
 mod events;
+mod mpv;
 mod properties;
 mod state;
 
