@@ -5,6 +5,7 @@
 //! done incrementally without changing runtime behaviour.
 
 mod error;
+mod properties;
 mod state;
 
 #[path = "../mpv.rs"]
