@@ -8,9 +8,10 @@ mod ws_protocol;
 mod ws_commands;
 mod ws_handlers;
 mod ws_config;
+mod ws_server;
 
 use axum::{
-    extract::{Path, State as AxumState, WebSocketUpgrade},
+    extract::{Path, State as AxumState},
     http::StatusCode,
     response::{Html, Json},
     routing::{get, post},
@@ -19,17 +20,10 @@ use axum::{
 use player::MpvPlayer;
 use app_config::{load_config, save_config, AppConfig};
 use app_state::AppState;
-use ws_commands::CommandRequest;
-use ws_handlers::handle_command;
-use ws_config::{
-    ERROR_BACKOFF, MAX_CONSECUTIVE_ERRORS, MIN_STATUS_INTERVAL, PAUSED_STATUS_INTERVAL,
-    PING_INTERVAL, PING_TIMEOUT, PLAYING_STATUS_INTERVAL,
-};
 use once_cell::sync::Lazy;
 use portpicker::pick_unused_port;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use serde_json::Value as JsonValue;
 use std::io::ErrorKind;
 use std::path::{Path as StdPath, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -40,21 +34,9 @@ use tauri::{
     tray::{MouseButton, TrayIconBuilder, TrayIconEvent},
     AppHandle, Manager, WebviewUrl, WindowEvent,
 };
-use tokio::time::{interval, MissedTickBehavior};
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::ServeDir;
 
-const RELEVANT_STATUS_KEYS: &[&str] = &[
-    "Status",
-    "Position",
-    "Duration",
-    "Path",
-    "Title",
-    "Loop",
-    "Offset",
-    "EndOfFile",
-    "Idle",
-];
 
 #[tauri::command]
 async fn sync_room(room_id: String) -> Result<String, String> {
@@ -204,172 +186,6 @@ async fn control_player(
     cmd_result
         .map(|_| Json(json!({ "status": "success", "action": action })))
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
-}
-
-async fn ws_handler(
-    ws: WebSocketUpgrade,
-    AxumState(state): AxumState<Arc<AppState>>,
-) -> impl axum::response::IntoResponse {
-    ws.on_upgrade(|socket| handle_socket(socket, state))
-}
-
-async fn handle_socket(mut socket: axum::extract::ws::WebSocket, state: Arc<AppState>) {
-    use axum::extract::ws::Message;
-    use std::sync::atomic::Ordering;
-    use tokio::time::{sleep, Instant};
-
-    let mut current_interval_duration = PLAYING_STATUS_INTERVAL; // Start with playing interval
-    let mut status_interval = interval(current_interval_duration);
-    status_interval.set_missed_tick_behavior(MissedTickBehavior::Delay); // Prevent burst ticks after delay
-    let mut last_known_pause_state = false; // Track pause state to adjust interval
-                                            // --- End Dynamic Interval Logic ---
-
-    // Connection state
-    let mut ping_interval = interval(PING_INTERVAL);
-    ping_interval.set_missed_tick_behavior(MissedTickBehavior::Delay);
-    let mut last_pong = Instant::now();
-    let mut consecutive_errors = 0;
-    let mut last_status_update = 0_u64;
-
-    // --- State for Conditional Updates ---
-    let mut last_sent_status: Option<JsonValue> = None; // Store the last sent status object
-                                                        // Define keys whose changes trigger an update
-    // --- Buffers ---
-    let mut status_buffer = String::with_capacity(1024);
-
-    'connection: loop {
-        tokio::select! {
-            biased; // Prioritize receiving messages over sending status/pings
-
-            result = socket.recv() => {
-                match result {
-                    Some(Ok(Message::Pong(_))) => {
-                        last_pong = Instant::now();
-                        consecutive_errors = 0;
-                    }
-                    Some(Ok(Message::Text(text))) => {
-                        last_pong = Instant::now(); // Treat text message as activity
-                        consecutive_errors = 0;
-                        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&text) {
-                            if let Some(command) = CommandRequest::from_json(&json) {
-                                handle_command(command, &mut socket, &state).await;
-                            }
-                        }
-                    }
-                    Some(Ok(Message::Close(_))) => {
-                        eprintln!("Clean WebSocket close received");
-                        break 'connection;
-                    }
-                    Some(Err(e)) => {
-                        eprintln!("WebSocket error: {}", e);
-                        consecutive_errors += 1;
-                        if consecutive_errors >= MAX_CONSECUTIVE_ERRORS {
-                            eprintln!("Too many errors, closing WebSocket");
-                            break 'connection;
-                        }
-                        sleep(ERROR_BACKOFF).await; // Backoff on error
-                    }
-                    None => {
-                        eprintln!("WebSocket closed by client.");
-                        break 'connection;
-                    }
-                    _ => {} // Ignore other message types like Binary
-                }
-            }
-
-            // --- Status Update Tick ---
-            _ = status_interval.tick() => {
-                let now = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap_or_default()
-                    .as_millis() as u64;
-
-                if now - last_status_update < MIN_STATUS_INTERVAL {
-                    continue;
-                }
-
-                match state.get_cached_status().await {
-                    Ok(current_status) => {
-                        // --- Check if status changed ---
-                        let mut should_send = true; // Send first time or if comparison fails
-                        if let Some(last_status) = &last_sent_status {
-                            // Compare only relevant keys for changes
-                            should_send = RELEVANT_STATUS_KEYS.iter().any(|key| {
-                                current_status.get(key) != last_status.get(key)
-                            });
-                        }
-                        // --- End Check ---
-
-                        if should_send {
-                            status_buffer.clear();
-                            if let Ok(status_str) = serde_json::to_string(&current_status) {
-                                status_buffer.push_str(&status_str);
-                                if socket.send(Message::Text(status_buffer.clone())).await.is_ok() {
-                                    last_sent_status = Some(current_status.clone()); // Store the sent status
-                                    last_status_update = now;
-                                    consecutive_errors = 0;
-
-                                    // Adjust Interval Logic (remains the same)
-                                    let is_paused = current_status.get("Status").and_then(|v| v.as_str()) == Some("Paused");
-                                    let desired_interval = if is_paused {
-                                        PAUSED_STATUS_INTERVAL
-                                    } else {
-                                        PLAYING_STATUS_INTERVAL
-                                    };
-                                    if is_paused != last_known_pause_state || current_interval_duration != desired_interval {
-                                        println!("Adjusting status interval. Paused: {}, New Interval: {:?}", is_paused, desired_interval);
-                                        status_interval = interval(desired_interval);
-                                        status_interval.set_missed_tick_behavior(MissedTickBehavior::Delay);
-                                        current_interval_duration = desired_interval;
-                                        last_known_pause_state = is_paused;
-                                    }
-                                } else {
-                                    eprintln!("Non-fatal status send error, will retry");
-                                    consecutive_errors += 1;
-                                    if consecutive_errors >= MAX_CONSECUTIVE_ERRORS {
-                                        eprintln!("Too many status send errors, closing WebSocket");
-                                        break 'connection;
-                                    }
-                                    sleep(ERROR_BACKOFF).await;
-                                }
-                            }
-                        } else {
-                            // Status hasn't changed significantly, skip sending
-                            // println!("Status unchanged, skipping send."); // Optional debug log
-                        }
-                    }
-                    Err(e) => {
-                        eprintln!("Error getting player status: {}", e);
-                        consecutive_errors += 1;
-                         if consecutive_errors >= MAX_CONSECUTIVE_ERRORS {
-                            eprintln!("Too many status get errors, closing WebSocket");
-                            break 'connection;
-                        }
-                        sleep(ERROR_BACKOFF).await; // Backoff on error
-                    }
-                }
-            }
-
-            // --- Ping Tick ---
-            _ = ping_interval.tick() => {
-                if last_pong.elapsed() > PING_TIMEOUT {
-                    eprintln!("WebSocket ping timeout, closing connection.");
-                    break 'connection;
-                }
-
-                if socket.send(Message::Ping(vec![])).await.is_err() {
-                    eprintln!("Non-fatal ping error, will retry");
-                    consecutive_errors += 1;
-                    if consecutive_errors >= MAX_CONSECUTIVE_ERRORS {
-                        eprintln!("Too many ping errors, closing WebSocket");
-                        break 'connection;
-                    }
-                     sleep(ERROR_BACKOFF).await; // Backoff on error
-                }
-            }
-        }
-    }
-    eprintln!("WebSocket connection ended.");
 }
 
 async fn status_page(
@@ -757,7 +573,7 @@ async fn main() {
             println!("Axum will serve static files from: {:?}", static_path);
 
             let axum_app = Router::new()
-                .route("/ws", get(ws_handler))
+                .route("/ws", get(ws_server::handler))
                 .route("/control/:action", post(control_player))
                 .route("/room/:id", get(room_status))
                 .route("/sync", post(sync))
