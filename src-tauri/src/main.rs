@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod player;
+mod app_config;
 
 use axum::{
     extract::{Path, State as AxumState, WebSocketUpgrade},
@@ -11,15 +12,14 @@ use axum::{
     Router,
 };
 use player::{Error as PlayerError, MpvPlayer};
+use app_config::{load_config, save_config, AppConfig};
 use once_cell::sync::Lazy;
 use portpicker::pick_unused_port;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use serde_json::Value as JsonValue;
 use std::collections::HashSet;
-use std::fs::{self, File};
 use std::io::ErrorKind;
-use std::io::{Read, Write};
 use std::path::{Path as StdPath, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -32,118 +32,6 @@ use tauri::{
 use tokio::time::{interval, MissedTickBehavior};
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::ServeDir;
-
-// --- Configuration Handling ---
-const CONFIG_FILE_NAME: &str = "alienor_config.json";
-const LEGACY_CONFIG_FILE_NAME: &str = "alien_config.json";
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-struct AppConfig {
-    port: Option<u16>,
-}
-
-impl Default for AppConfig {
-    fn default() -> Self {
-        AppConfig { port: None }
-    }
-}
-
-fn get_config_path(app_handle: &AppHandle) -> std::io::Result<PathBuf> {
-    let config_dir = app_handle.path().app_config_dir().map_err(|e| {
-        std::io::Error::new(
-            std::io::ErrorKind::NotFound,
-            format!("App config directory not found: {}", e),
-        )
-    })?;
-    // Ensure the config directory exists
-    fs::create_dir_all(&config_dir)?;
-    Ok(config_dir.join(CONFIG_FILE_NAME))
-}
-
-fn get_legacy_config_path(app_handle: &AppHandle) -> std::io::Result<PathBuf> {
-    let config_dir = app_handle.path().app_config_dir().map_err(|e| {
-        std::io::Error::new(
-            std::io::ErrorKind::NotFound,
-            format!("App config directory not found: {}", e),
-        )
-    })?;
-    Ok(config_dir.join(LEGACY_CONFIG_FILE_NAME))
-}
-
-fn load_config(app_handle: &AppHandle) -> AppConfig {
-    match get_config_path(app_handle) {
-        Ok(path) => {
-            let default_path = path.clone();
-            let legacy_path = get_legacy_config_path(app_handle).ok();
-            let load_path = if path.exists() {
-                path.clone()
-            } else if let Some(legacy) = legacy_path {
-                if legacy.exists() {
-                    println!("Using legacy config path: {:?}", legacy);
-                    legacy
-                } else {
-                    path.clone()
-                }
-            } else {
-                path.clone()
-            };
-
-            if load_path.exists() {
-                match File::open(&load_path) {
-                    Ok(mut file) => {
-                        let mut contents = String::new();
-                        if file.read_to_string(&mut contents).is_ok() {
-                            match serde_json::from_str(&contents) {
-                                Ok(config) => {
-                                    println!("Loaded config from {:?}: {:?}", load_path, config);
-                                    config
-                                }
-                                Err(e) => {
-                                    eprintln!(
-                                        "Failed to parse config file {:?}: {}. Using default.",
-                                        load_path, e
-                                    );
-                                    AppConfig::default()
-                                }
-                            }
-                        } else {
-                            eprintln!(
-                                "Failed to read config file {:?}. Using default.",
-                                load_path
-                            );
-                            AppConfig::default()
-                        }
-                    }
-                    Err(e) => {
-                        eprintln!(
-                            "Failed to open config file {:?}: {}. Using default.",
-                            load_path, e
-                        );
-                        AppConfig::default()
-                    }
-                }
-            } else {
-                println!("Config file {:?} not found. Using default.", default_path);
-                AppConfig::default()
-            }
-        }
-        Err(e) => {
-            eprintln!("Failed to determine config path: {}. Using default.", e);
-            AppConfig::default()
-        }
-    }
-}
-
-fn save_config(app_handle: &AppHandle, config: &AppConfig) -> std::io::Result<()> {
-    let path = get_config_path(app_handle)?;
-    let contents = serde_json::to_string_pretty(config)
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
-    let mut file = File::create(&path)?;
-    file.write_all(contents.as_bytes())?;
-    println!("Saved config to {:?}: {:?}", path, config);
-    Ok(())
-}
-// --- End Configuration Handling ---
 
 struct AppState {
     player: Arc<MpvPlayer>,
