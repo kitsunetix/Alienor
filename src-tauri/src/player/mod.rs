@@ -6,6 +6,7 @@
 
 mod commands;
 mod error;
+mod events;
 mod properties;
 mod state;
 
