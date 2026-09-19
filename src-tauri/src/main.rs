@@ -4,6 +4,7 @@
 mod player;
 mod app_config;
 mod app_state;
+mod ws_protocol;
 
 use axum::{
     extract::{Path, State as AxumState, WebSocketUpgrade},
@@ -15,6 +16,7 @@ use axum::{
 use player::{Error as PlayerError, MpvPlayer};
 use app_config::{load_config, save_config, AppConfig};
 use app_state::AppState;
+use ws_protocol::send_error;
 use once_cell::sync::Lazy;
 use portpicker::pick_unused_port;
 use serde::{Deserialize, Serialize};
@@ -192,27 +194,6 @@ async fn ws_handler(
     ws.on_upgrade(|socket| handle_socket(socket, state))
 }
 
-// Helper to send JSON error messages over WebSocket
-async fn send_ws_error(
-    socket: &mut axum::extract::ws::WebSocket,
-    command: &str,
-    error_message: &str,
-) {
-    use axum::extract::ws::Message;
-    let error_json = json!({
-        "status": "error",
-        "command": command,
-        "error": error_message
-    });
-    if let Ok(error_str) = serde_json::to_string(&error_json) {
-        if socket.send(Message::Text(error_str)).await.is_err() {
-            eprintln!("Failed to send WebSocket error message");
-        }
-    } else {
-        eprintln!("Failed to serialize error message");
-    }
-}
-
 async fn handle_socket(mut socket: axum::extract::ws::WebSocket, state: Arc<AppState>) {
     use axum::extract::ws::Message;
     use std::sync::atomic::Ordering;
@@ -292,10 +273,10 @@ async fn handle_socket(mut socket: axum::extract::ws::WebSocket, state: Arc<AppS
                                             println!("Loading URL: {}", url);
                                             if let Err(e) = state.player.load_file(url) {
                                                 eprintln!("Error loading URL: {}", e);
-                                                send_ws_error(&mut socket, "loadURL", &e.to_string()).await;
+                                                send_error(&mut socket, "loadURL", &e.to_string()).await;
                                             }
                                         } else {
-                                             send_ws_error(&mut socket, "loadURL", "Missing or invalid 'url' field").await;
+                                             send_error(&mut socket, "loadURL", "Missing or invalid 'url' field").await;
                                         }
                                     },
                                     "play" => {
@@ -303,7 +284,7 @@ async fn handle_socket(mut socket: axum::extract::ws::WebSocket, state: Arc<AppS
                                             Ok(_) => println!("Play command executed successfully via WebSocket"),
                                             Err(e) => {
                                                 eprintln!("Error setting pause=false: {}", e);
-                                                send_ws_error(&mut socket, "play", &e.to_string()).await;
+                                                send_error(&mut socket, "play", &e.to_string()).await;
                                             }
                                         }
                                     },
@@ -312,7 +293,7 @@ async fn handle_socket(mut socket: axum::extract::ws::WebSocket, state: Arc<AppS
                                             Ok(_) => println!("Pause command executed successfully via WebSocket"),
                                             Err(e) => {
                                                 eprintln!("Error setting pause=true: {}", e);
-                                                send_ws_error(&mut socket, "pause", &e.to_string()).await;
+                                                send_error(&mut socket, "pause", &e.to_string()).await;
                                             }
                                         }
                                     },
@@ -324,10 +305,10 @@ async fn handle_socket(mut socket: axum::extract::ws::WebSocket, state: Arc<AppS
                                             println!("WebSocket seek: adjusted to {} from {} (offset {})", adjusted_time, position, offset);
                                             if let Err(e) = state.player.command("seek", &[&adjusted_time.to_string(), "absolute", "exact"]) {
                                                 eprintln!("Error seeking: {}", e);
-                                                send_ws_error(&mut socket, "seek", &e.to_string()).await;
+                                                send_error(&mut socket, "seek", &e.to_string()).await;
                                             }
                                         } else {
-                                            send_ws_error(&mut socket, "seek", "Missing or invalid 'position' field").await;
+                                            send_error(&mut socket, "seek", "Missing or invalid 'position' field").await;
                                         }
                                     },
                                     "setOffset" => {
@@ -376,7 +357,7 @@ async fn handle_socket(mut socket: axum::extract::ws::WebSocket, state: Arc<AppS
                                             },
                                             Err(e) => {
                                                 eprintln!("Error setting offset: {}", e);
-                                                send_ws_error(&mut socket, "setOffset", &e.to_string()).await;
+                                                send_error(&mut socket, "setOffset", &e.to_string()).await;
                                             }
                                         }
                                     },
@@ -415,11 +396,11 @@ async fn handle_socket(mut socket: axum::extract::ws::WebSocket, state: Arc<AppS
                                                 },
                                                 Err(e) => {
                                                 eprintln!("Error setting loop: {}", e);
-                                                    send_ws_error(&mut socket, "setLoop", &e.to_string()).await;
+                                                    send_error(&mut socket, "setLoop", &e.to_string()).await;
                                                 }
                                             }
                                         } else {
-                                            send_ws_error(&mut socket, "setLoop", "Missing or invalid 'enabled' field").await;
+                                            send_error(&mut socket, "setLoop", "Missing or invalid 'enabled' field").await;
                                         }
                                     },
                                     "getLoop" => {
@@ -441,13 +422,13 @@ async fn handle_socket(mut socket: axum::extract::ws::WebSocket, state: Arc<AppS
                                             Err(e) => {
                                                 eprintln!("Error getting loop status: {}", e);
                                                 // Optionally send error back if needed
-                                                // send_ws_error(&mut socket, "getLoop", &e.to_string()).await;
+                                                // send_error(&mut socket, "getLoop", &e.to_string()).await;
                                             }
                                         }
                                     },
                                     _ => {
                                         eprintln!("Received unknown WebSocket command: {}", command_str);
-                                        send_ws_error(&mut socket, command_str, "Unknown command").await;
+                                        send_error(&mut socket, command_str, "Unknown command").await;
                                 }
                                 }
                                 // --- End WebSocket Command Handling ---
