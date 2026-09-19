@@ -5,9 +5,10 @@
 //! done incrementally without changing runtime behaviour.
 
 mod error;
+mod state;
 
 #[path = "../mpv.rs"]
 mod legacy_mpv;
 
 pub use error::Error;
-pub use legacy_mpv::MpvPlayer;
+pub use state::MpvPlayer;

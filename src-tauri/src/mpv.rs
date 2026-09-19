@@ -1,20 +1,10 @@
 use libmpv2::{events::Event, Mpv};
 use serde_json::{self, json, Value as JsonValue};
-use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
+use std::sync::atomic::Ordering;
 use std::sync::mpsc;
-use std::sync::Arc;
 use std::sync::Mutex;
 use super::error::Error;
-
-pub struct MpvPlayer {
-    handle: Arc<Mutex<Mpv>>,
-    quit_flag: Arc<AtomicBool>,
-    offset_seconds: Arc<AtomicI64>, // Store offset in milliseconds internally
-    last_moon_time_ms: Arc<AtomicI64>, // Last Moon Animator time in milliseconds (-1 if unknown)
-}
-
-unsafe impl Send for MpvPlayer {}
-unsafe impl Sync for MpvPlayer {}
+use super::state::MpvPlayer;
 
 #[allow(dead_code)]
 impl MpvPlayer {
