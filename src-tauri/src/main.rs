@@ -486,7 +486,7 @@ async fn handle_socket(mut socket: axum::extract::ws::WebSocket, state: Arc<AppS
                     continue;
                 }
 
-                match state.player.get_status() {
+                match state.get_cached_status().await {
                     Ok(current_status) => {
                         // --- Check if status changed ---
                         let mut should_send = true; // Send first time or if comparison fails
@@ -946,6 +946,7 @@ async fn main() {
                 port,
                 last_seek: Arc::new(AtomicU64::new(0)),
                 config: initial_config,
+                status_cache: tokio::sync::Mutex::new(app_state::StatusCache::default()),
             });
             app.manage(app_state.clone());
 
