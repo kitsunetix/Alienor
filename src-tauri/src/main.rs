@@ -25,7 +25,6 @@ use portpicker::pick_unused_port;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use serde_json::Value as JsonValue;
-use std::collections::HashSet;
 use std::io::ErrorKind;
 use std::path::{Path as StdPath, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -39,6 +38,18 @@ use tauri::{
 use tokio::time::{interval, MissedTickBehavior};
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::ServeDir;
+
+const RELEVANT_STATUS_KEYS: &[&str] = &[
+    "Status",
+    "Position",
+    "Duration",
+    "Path",
+    "Title",
+    "Loop",
+    "Offset",
+    "EndOfFile",
+    "Idle",
+];
 
 #[tauri::command]
 async fn sync_room(room_id: String) -> Result<String, String> {
@@ -228,21 +239,6 @@ async fn handle_socket(mut socket: axum::extract::ws::WebSocket, state: Arc<AppS
     // --- State for Conditional Updates ---
     let mut last_sent_status: Option<JsonValue> = None; // Store the last sent status object
                                                         // Define keys whose changes trigger an update
-    let relevant_keys: HashSet<String> = [
-        "Status",
-        "Position",
-        "Duration",
-        "Path",
-        "Title",
-        "Loop",
-        "Offset",
-        "EndOfFile",
-        "Idle",
-    ]
-    .iter()
-    .map(|s| s.to_string())
-    .collect();
-
     // --- Buffers ---
     let mut status_buffer = String::with_capacity(1024);
 
@@ -303,7 +299,7 @@ async fn handle_socket(mut socket: axum::extract::ws::WebSocket, state: Arc<AppS
                         let mut should_send = true; // Send first time or if comparison fails
                         if let Some(last_status) = &last_sent_status {
                             // Compare only relevant keys for changes
-                            should_send = relevant_keys.iter().any(|key| {
+                            should_send = RELEVANT_STATUS_KEYS.iter().any(|key| {
                                 current_status.get(key) != last_status.get(key)
                             });
                         }
