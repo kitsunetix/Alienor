@@ -8,6 +8,7 @@ mod server;
 mod server_config;
 mod player_monitor;
 mod synchronization;
+mod app_commands;
 
 use axum::extract::State as AxumState;
 use player::MpvPlayer;
@@ -28,7 +29,7 @@ use tauri::{
 
 
 #[tauri::command]
-async fn exit_app(
+async fn legacy_exit_app(
     app_handle: tauri::AppHandle,
     state: tauri::State<'_, Arc<AppState>>,
 ) -> Result<(), String> {
@@ -42,7 +43,7 @@ async fn exit_app(
 }
 
 #[tauri::command]
-async fn set_port_and_restart(
+async fn legacy_set_port_and_restart(
     app_handle: tauri::AppHandle,
     state: tauri::State<'_, Arc<AppState>>,
     new_port: u16,
@@ -70,7 +71,7 @@ async fn set_port_and_restart(
 }
 
 #[tauri::command]
-async fn reset_port_and_restart(
+async fn legacy_reset_port_and_restart(
     app_handle: tauri::AppHandle,
     state: tauri::State<'_, Arc<AppState>>,
 ) -> Result<(), String> {
@@ -93,7 +94,7 @@ async fn reset_port_and_restart(
 
 // --- New Command: Clear Saved Port (No Restart) ---
 #[tauri::command]
-async fn clear_saved_port(
+async fn legacy_clear_saved_port(
     app_handle: tauri::AppHandle,
     state: tauri::State<'_, Arc<AppState>>,
 ) -> Result<(), String> {
@@ -123,10 +124,10 @@ async fn main() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             sync_room,
-            exit_app,
-            set_port_and_restart,
-            reset_port_and_restart,
-            clear_saved_port
+            app_commands::exit_app,
+            app_commands::set_port_and_restart,
+            app_commands::reset_port_and_restart,
+            app_commands::clear_saved_port
         ])
         .setup(|app| {
             let app_handle = app.handle().clone();
