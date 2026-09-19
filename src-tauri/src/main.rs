@@ -12,109 +12,19 @@ mod app_commands;
 
 use axum::extract::State as AxumState;
 use player::MpvPlayer;
-use app_config::{load_config, save_config, AppConfig};
+use app_config::load_config;
 use app_state::AppState;
 use server::http::misc::sync_room;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::io::ErrorKind;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
-use std::time::Duration;
 use tauri::{
     menu::{MenuBuilder, MenuItemBuilder},
     tray::{MouseButton, TrayIconBuilder, TrayIconEvent},
     AppHandle, Manager, WebviewUrl, WindowEvent,
 };
-
-
-#[tauri::command]
-async fn legacy_exit_app(
-    app_handle: tauri::AppHandle,
-    state: tauri::State<'_, Arc<AppState>>,
-) -> Result<(), String> {
-    println!("Exit requested.");
-    state.player.exit();
-    tokio::spawn(async move {
-        tokio::time::sleep(Duration::from_millis(500)).await;
-        app_handle.exit(0);
-    });
-    Ok(())
-}
-
-#[tauri::command]
-async fn legacy_set_port_and_restart(
-    app_handle: tauri::AppHandle,
-    state: tauri::State<'_, Arc<AppState>>,
-    new_port: u16,
-) -> Result<(), String> {
-    println!("Set port and restart requested: New port = {}", new_port);
-    if !(1025..=65535).contains(&new_port) {
-        return Err("Invalid port number. Must be between 1025 and 65535.".to_string());
-    }
-    let mut config_guard = state.config.lock().await;
-    config_guard.port = Some(new_port);
-    if let Err(e) = save_config(&app_handle, &config_guard) {
-        eprintln!("Failed to save config: {}", e);
-        return Err(format!("Failed to save configuration: {}", e));
-    }
-    drop(config_guard);
-    println!("Configuration saved. Attempting to restart application...");
-    state.player.exit();
-    tokio::time::sleep(Duration::from_millis(1500)).await;
-
-    // Call restart. This terminates the process if successful.
-    app_handle.restart();
-    // No code needed here. If restart() succeeds, process terminates.
-    // If it somehow failed and returned, the function would implicitly complete,
-    // satisfying the Result<(), String> signature, but this path isn't expected.
-}
-
-#[tauri::command]
-async fn legacy_reset_port_and_restart(
-    app_handle: tauri::AppHandle,
-    state: tauri::State<'_, Arc<AppState>>,
-) -> Result<(), String> {
-    println!("Reset port to auto-detect and restart requested.");
-    let mut config_guard = state.config.lock().await;
-    config_guard.port = None;
-    if let Err(e) = save_config(&app_handle, &config_guard) {
-        eprintln!("Failed to save config for reset: {}", e);
-        return Err(format!("Failed to save configuration for reset: {}", e));
-    }
-    drop(config_guard);
-    println!("Configuration saved for reset. Attempting to restart application...");
-    state.player.exit();
-    tokio::time::sleep(Duration::from_millis(1500)).await;
-
-    // Call restart. This terminates the process if successful.
-    app_handle.restart();
-    // No code needed here.
-}
-
-// --- New Command: Clear Saved Port (No Restart) ---
-#[tauri::command]
-async fn legacy_clear_saved_port(
-    app_handle: tauri::AppHandle,
-    state: tauri::State<'_, Arc<AppState>>,
-) -> Result<(), String> {
-    println!("Clear saved port requested.");
-    let mut config_guard = state.config.lock().await;
-    if config_guard.port.is_none() {
-        println!("No specific port was saved. Nothing to clear.");
-        return Ok(()); // Nothing to do
-    }
-    config_guard.port = None; // Set to None for auto-detect on next launch
-    if let Err(e) = save_config(&app_handle, &config_guard) {
-        eprintln!("Failed to save config for port clear: {}", e);
-        return Err(format!(
-            "Failed to save configuration for port clear: {}",
-            e
-        ));
-    }
-    println!("Saved port configuration cleared. Will use auto-detect on next launch.");
-    Ok(())
-}
 
 #[tokio::main]
 async fn main() {
