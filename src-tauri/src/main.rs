@@ -239,7 +239,7 @@ async fn handle_socket(mut socket: axum::extract::ws::WebSocket, state: Arc<AppS
     ping_interval.set_missed_tick_behavior(MissedTickBehavior::Delay);
     let mut last_pong = Instant::now();
     let mut consecutive_errors = 0;
-    let last_status_update = Arc::new(AtomicU64::new(0));
+    let mut last_status_update = 0_u64;
 
     // --- State for Conditional Updates ---
     let mut last_sent_status: Option<JsonValue> = None; // Store the last sent status object
@@ -482,7 +482,7 @@ async fn handle_socket(mut socket: axum::extract::ws::WebSocket, state: Arc<AppS
                     .unwrap_or_default()
                     .as_millis() as u64;
 
-                if now - last_status_update.load(Ordering::Relaxed) < MIN_STATUS_INTERVAL {
+                if now - last_status_update < MIN_STATUS_INTERVAL {
                     continue;
                 }
 
@@ -504,7 +504,7 @@ async fn handle_socket(mut socket: axum::extract::ws::WebSocket, state: Arc<AppS
                                 status_buffer.push_str(&status_str);
                                 if socket.send(Message::Text(status_buffer.clone())).await.is_ok() {
                                     last_sent_status = Some(current_status.clone()); // Store the sent status
-                                    last_status_update.store(now, Ordering::Relaxed);
+                                    last_status_update = now;
                                     consecutive_errors = 0;
 
                                     // Adjust Interval Logic (remains the same)
