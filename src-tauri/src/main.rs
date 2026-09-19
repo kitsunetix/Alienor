@@ -13,14 +13,9 @@ mod http_misc;
 mod http_playback;
 mod http_pages;
 mod http_control;
+mod http_server;
 
-use axum::{
-    extract::State as AxumState,
-    http::StatusCode,
-    response::Json,
-    routing::{get, post},
-    Router,
-};
+use axum::extract::State as AxumState;
 use player::MpvPlayer;
 use app_config::{load_config, save_config, AppConfig};
 use app_state::AppState;
@@ -29,7 +24,6 @@ use portpicker::pick_unused_port;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::io::ErrorKind;
-use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -38,8 +32,6 @@ use tauri::{
     tray::{MouseButton, TrayIconBuilder, TrayIconEvent},
     AppHandle, Manager, WebviewUrl, WindowEvent,
 };
-use tower_http::cors::{Any, CorsLayer};
-use tower_http::services::ServeDir;
 
 
 #[tauri::command]
@@ -190,33 +182,8 @@ async fn main() {
             let static_path = http_pages::find_templates_dir();
             println!("Axum will serve static files from: {:?}", static_path);
 
-            let axum_app = Router::new()
-                .route("/ws", get(ws_server::handler))
-                .route("/control/:action", post(http_control::control_player))
-                .route("/room/:id", get(http_misc::room_status))
-                .route("/sync", post(http_misc::sync))
-                .route("/playback/time", get(http_playback::get_playback_time).post(http_playback::set_playback_time))
-                .route("/playback/offset", get(http_playback::get_offset).post(http_playback::set_offset))
-                .route("/playback/loop", get(http_playback::get_loop).post(http_playback::set_loop))
-                .route("/status", get(http_playback::get_connection_status))
-                .route("/", get(http_pages::status_page))
-                .nest_service("/static", ServeDir::new(static_path))
-                .layer(CorsLayer::new().allow_origin(Any).allow_methods(Any).allow_headers(Any))
-                .with_state(app_state.clone());
-
-            tokio::spawn(async move {
-                match tokio::net::TcpListener::bind(format!("0.0.0.0:{}", port)).await {
-                    Ok(listener) => {
-                        println!("Server running on http://localhost:{}", port);
-                        if let Err(e) = axum::serve(listener, axum_app).await {
-                            eprintln!("Server error: {}", e);
-                        }
-                    }
-                    Err(e) => {
-                        eprintln!("Failed to bind Axum server to port {}: {}", port, e);
-                    }
-                }
-            });
+            let axum_app = http_server::router(app_state.clone(), static_path);
+            tokio::spawn(http_server::serve(port, axum_app));
 
             // --- Create Tray Menu (Using Builder Pattern) ---
             let quit_item = MenuItemBuilder::new("Quit Alienor")
