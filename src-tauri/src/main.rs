@@ -14,13 +14,13 @@ mod http_playback;
 mod http_pages;
 mod http_control;
 mod http_server;
+mod server_config;
 
 use axum::extract::State as AxumState;
 use player::MpvPlayer;
 use app_config::{load_config, save_config, AppConfig};
 use app_state::AppState;
 use http_misc::sync_room;
-use portpicker::pick_unused_port;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::io::ErrorKind;
@@ -140,28 +140,7 @@ async fn main() {
             let config = load_config(&app_handle);
             let initial_config = Arc::new(tokio::sync::Mutex::new(config.clone()));
 
-            // --- Determine Port (Sync check) ---
-            let port = match config.port {
-                Some(p) if (1025..=65535).contains(&p) => {
-                    match std::net::TcpListener::bind(format!("0.0.0.0:{}", p)) {
-                        Ok(listener) => { drop(listener); p },
-                        Err(e) => {
-                            eprintln!("Configured port {} is unavailable: {}. Falling back.", p, e);
-                            pick_unused_port().expect("No ports available")
-                        }
-                    }
-                },
-                Some(p) => {
-                    eprintln!("Configured port {} is invalid. Falling back.", p);
-                    pick_unused_port().expect("No ports available")
-                }
-                None => {
-                    match std::net::TcpListener::bind(("0.0.0.0", 3000)) {
-                        Ok(listener) => { drop(listener); 3000 },
-                        Err(_) => pick_unused_port().expect("No ports available"),
-                    }
-                }
-            };
+            let port = server_config::select_port(config.port);
             let url = format!("http://localhost:{}", port);
 
             // --- Initialize MPV Player ---
