@@ -15,7 +15,7 @@ mod http_pages;
 mod http_control;
 
 use axum::{
-    extract::{Path, State as AxumState},
+    extract::State as AxumState,
     http::StatusCode,
     response::Json,
     routing::{get, post},
