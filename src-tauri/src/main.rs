@@ -7,6 +7,7 @@ mod app_state;
 mod ws_protocol;
 mod ws_commands;
 mod ws_handlers;
+mod ws_config;
 
 use axum::{
     extract::{Path, State as AxumState, WebSocketUpgrade},
@@ -20,6 +21,10 @@ use app_config::{load_config, save_config, AppConfig};
 use app_state::AppState;
 use ws_commands::CommandRequest;
 use ws_handlers::handle_command;
+use ws_config::{
+    ERROR_BACKOFF, MAX_CONSECUTIVE_ERRORS, MIN_STATUS_INTERVAL, PAUSED_STATUS_INTERVAL,
+    PING_INTERVAL, PING_TIMEOUT, PLAYING_STATUS_INTERVAL,
+};
 use once_cell::sync::Lazy;
 use portpicker::pick_unused_port;
 use serde::{Deserialize, Serialize};
@@ -213,21 +218,11 @@ async fn handle_socket(mut socket: axum::extract::ws::WebSocket, state: Arc<AppS
     use std::sync::atomic::Ordering;
     use tokio::time::{sleep, Instant};
 
-    // --- Dynamic Interval Logic ---
-    const PLAYING_STATUS_INTERVAL: Duration = Duration::from_millis(100); // Faster when playing
-    const PAUSED_STATUS_INTERVAL: Duration = Duration::from_millis(300); // Slower when paused
     let mut current_interval_duration = PLAYING_STATUS_INTERVAL; // Start with playing interval
     let mut status_interval = interval(current_interval_duration);
     status_interval.set_missed_tick_behavior(MissedTickBehavior::Delay); // Prevent burst ticks after delay
     let mut last_known_pause_state = false; // Track pause state to adjust interval
                                             // --- End Dynamic Interval Logic ---
-
-    // Constants for connection management
-    const PING_INTERVAL: Duration = Duration::from_secs(15);
-    const PING_TIMEOUT: Duration = Duration::from_secs(60);
-    const MAX_CONSECUTIVE_ERRORS: u32 = 20;
-    const MIN_STATUS_INTERVAL: u64 = 8;
-    const ERROR_BACKOFF: Duration = Duration::from_millis(100);
 
     // Connection state
     let mut ping_interval = interval(PING_INTERVAL);
