@@ -9,6 +9,7 @@ mod ws_commands;
 mod ws_handlers;
 mod ws_config;
 mod ws_server;
+mod http_misc;
 
 use axum::{
     extract::{Path, State as AxumState},
@@ -20,6 +21,7 @@ use axum::{
 use player::MpvPlayer;
 use app_config::{load_config, save_config, AppConfig};
 use app_state::AppState;
+use http_misc::sync_room;
 use once_cell::sync::Lazy;
 use portpicker::pick_unused_port;
 use serde::{Deserialize, Serialize};
@@ -37,12 +39,6 @@ use tauri::{
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::ServeDir;
 
-
-#[tauri::command]
-async fn sync_room(room_id: String) -> Result<String, String> {
-    println!("Sync request for room: {}", room_id);
-    Ok(format!("Connected to room {}", room_id))
-}
 
 #[tauri::command]
 async fn exit_app(
@@ -212,21 +208,6 @@ async fn status_page(
         .replace("{port}", &current_port.to_string());
 
     Ok(Html(html))
-}
-
-async fn room_status(Path(room_id): Path<String>) -> Json<serde_json::Value> {
-    Json(json!({
-        "room": room_id,
-        "status": "active",
-        "users": []
-    }))
-}
-
-async fn sync() -> Json<serde_json::Value> {
-    Json(json!({
-        "status": "synced",
-        "timestamp": chrono::Utc::now().timestamp()
-    }))
 }
 
 // Add new API endpoints for Roblox sync
@@ -575,8 +556,8 @@ async fn main() {
             let axum_app = Router::new()
                 .route("/ws", get(ws_server::handler))
                 .route("/control/:action", post(control_player))
-                .route("/room/:id", get(room_status))
-                .route("/sync", post(sync))
+                .route("/room/:id", get(http_misc::room_status))
+                .route("/sync", post(http_misc::sync))
                 .route("/playback/time", get(get_playback_time).post(set_playback_time))
                 .route("/playback/offset", get(get_offset).post(set_offset))
                 .route("/playback/loop", get(get_loop).post(set_loop))
