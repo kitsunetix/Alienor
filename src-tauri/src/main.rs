@@ -18,7 +18,7 @@ use player::{Error as PlayerError, MpvPlayer};
 use app_config::{load_config, save_config, AppConfig};
 use app_state::AppState;
 use ws_protocol::send_error;
-use ws_commands::CommandName;
+use ws_commands::CommandRequest;
 use once_cell::sync::Lazy;
 use portpicker::pick_unused_port;
 use serde::{Deserialize, Serialize};
@@ -267,21 +267,17 @@ async fn handle_socket(mut socket: axum::extract::ws::WebSocket, state: Arc<AppS
                         last_pong = Instant::now(); // Treat text message as activity
                         consecutive_errors = 0;
                         if let Ok(json) = serde_json::from_str::<serde_json::Value>(&text) {
-                            if let Some(command) = CommandName::from_json(&json) {
+                            if let Some(command) = CommandRequest::from_json(&json) {
                                 // --- WebSocket Command Handling with Error Reporting ---
                                 match command {
-                                    CommandName::LoadUrl => {
-                                        if let Some(url) = json.get("url").and_then(|v| v.as_str()) {
-                                            println!("Loading URL: {}", url);
-                                            if let Err(e) = state.player.load_file(url) {
-                                                eprintln!("Error loading URL: {}", e);
-                                                send_error(&mut socket, "loadURL", &e.to_string()).await;
-                                            }
-                                        } else {
-                                             send_error(&mut socket, "loadURL", "Missing or invalid 'url' field").await;
+                                    CommandRequest::LoadUrl(url) => {
+                                        println!("Loading URL: {}", url);
+                                        if let Err(e) = state.player.load_file(&url) {
+                                            eprintln!("Error loading URL: {}", e);
+                                            send_error(&mut socket, "loadURL", &e.to_string()).await;
                                         }
                                     },
-                                    CommandName::Play => {
+                                    CommandRequest::Play => {
                                         match state.player.set_property("pause", "false") { // Use set_property directly
                                             Ok(_) => println!("Play command executed successfully via WebSocket"),
                                             Err(e) => {
@@ -290,7 +286,7 @@ async fn handle_socket(mut socket: axum::extract::ws::WebSocket, state: Arc<AppS
                                             }
                                         }
                                     },
-                                    CommandName::Pause => {
+                                    CommandRequest::Pause => {
                                          match state.player.set_property("pause", "true") { // Use set_property directly
                                             Ok(_) => println!("Pause command executed successfully via WebSocket"),
                                             Err(e) => {
@@ -299,35 +295,29 @@ async fn handle_socket(mut socket: axum::extract::ws::WebSocket, state: Arc<AppS
                                             }
                                         }
                                     },
-                                    CommandName::Seek => {
-                                        if let Some(position) = json.get("position").and_then(|v| v.as_f64()) {
-                                            println!("Seeking to: {}", position);
-                                            let offset = state.player.get_offset_seconds();
-                                            let adjusted_time = position + offset;
-                                            println!("WebSocket seek: adjusted to {} from {} (offset {})", adjusted_time, position, offset);
-                                            if let Err(e) = state.player.command("seek", &[&adjusted_time.to_string(), "absolute", "exact"]) {
-                                                eprintln!("Error seeking: {}", e);
-                                                send_error(&mut socket, "seek", &e.to_string()).await;
-                                            }
-                                        } else {
-                                            send_error(&mut socket, "seek", "Missing or invalid 'position' field").await;
+                                    CommandRequest::Seek(position) => {
+                                        println!("Seeking to: {}", position);
+                                        let offset = state.player.get_offset_seconds();
+                                        let adjusted_time = position + offset;
+                                        println!("WebSocket seek: adjusted to {} from {} (offset {})", adjusted_time, position, offset);
+                                        if let Err(e) = state.player.command("seek", &[&adjusted_time.to_string(), "absolute", "exact"]) {
+                                            eprintln!("Error seeking: {}", e);
+                                            send_error(&mut socket, "seek", &e.to_string()).await;
                                         }
                                     },
-                                    CommandName::SetOffset => {
+                                    CommandRequest::SetOffset { seconds, frames, fps } => {
                                         let mut offset_result: Result<f64, PlayerError> = Err(PlayerError::CommandError("Invalid offset parameters".to_string(), -1));
                                         let mut update_type = "seconds"; // For response message
                                         let mut original_value: f64 = 0.0;
-                                        let mut fps_value: f64 = 30.0;
 
-                                        if let Some(seconds) = json.get("seconds").and_then(|v| v.as_f64()) {
+                                        if let Some(seconds) = seconds {
                                             println!("Setting offset to {} seconds via WebSocket", seconds);
                                             offset_result = state.player.set_offset_seconds(seconds).map(|_| seconds);
                                             original_value = seconds;
-                                        } else if let Some(frames) = json.get("frames").and_then(|v| v.as_i64()) {
-                                            fps_value = json.get("fps").and_then(|v| v.as_f64()).unwrap_or(30.0);
-                                            println!("Setting offset to {} frames at {} fps via WebSocket", frames, fps_value);
-                                            let seconds = frames as f64 / fps_value;
-                                            offset_result = state.player.set_offset_frames(frames as i32, fps_value).map(|_| seconds);
+                                        } else if let Some(frames) = frames {
+                                            println!("Setting offset to {} frames at {} fps via WebSocket", frames, fps);
+                                            let seconds = frames as f64 / fps;
+                                            offset_result = state.player.set_offset_frames(frames as i32, fps).map(|_| seconds);
                                             update_type = "frames";
                                             original_value = frames as f64;
                                         }
@@ -346,7 +336,7 @@ async fn handle_socket(mut socket: axum::extract::ws::WebSocket, state: Arc<AppS
                                                         "command": "offsetUpdated",
                                                         "frames": original_value as i64,
                                                         "seconds": calculated_seconds,
-                                                        "fps": fps_value
+                                                        "fps": fps
                                                     })
                                                 };
                                                 if let Ok(response_str) = serde_json::to_string(&response_json) {
@@ -363,7 +353,7 @@ async fn handle_socket(mut socket: axum::extract::ws::WebSocket, state: Arc<AppS
                                             }
                                         }
                                     },
-                                    CommandName::GetOffset => {
+                                    CommandRequest::GetOffset => {
                                         let offset = state.player.get_offset_seconds();
                                         let response = json!({
                                             "status": "success",
@@ -378,10 +368,9 @@ async fn handle_socket(mut socket: axum::extract::ws::WebSocket, state: Arc<AppS
                                              eprintln!("Error serializing offset status");
                                         }
                                     },
-                                    CommandName::SetLoop => {
-                                        if let Some(enabled) = json.get("enabled").and_then(|v| v.as_bool()) {
-                                            println!("Setting loop to: {}", enabled);
-                                            match state.player.set_loop(enabled) {
+                                    CommandRequest::SetLoop(enabled) => {
+                                        println!("Setting loop to: {}", enabled);
+                                        match state.player.set_loop(enabled) {
                                                 Ok(_) => {
                                                     let response = json!({
                                                         "status": "success",
@@ -400,12 +389,9 @@ async fn handle_socket(mut socket: axum::extract::ws::WebSocket, state: Arc<AppS
                                                 eprintln!("Error setting loop: {}", e);
                                                     send_error(&mut socket, "setLoop", &e.to_string()).await;
                                                 }
-                                            }
-                                        } else {
-                                            send_error(&mut socket, "setLoop", "Missing or invalid 'enabled' field").await;
                                         }
                                     },
-                                    CommandName::GetLoop => {
+                                    CommandRequest::GetLoop => {
                                         match state.player.get_loop() {
                                             Ok(enabled) => {
                                                 let response = json!({
@@ -428,7 +414,10 @@ async fn handle_socket(mut socket: axum::extract::ws::WebSocket, state: Arc<AppS
                                             }
                                         }
                                     },
-                                    CommandName::Unknown(command_name) => {
+                                    CommandRequest::Invalid { command, message } => {
+                                        send_error(&mut socket, &command, message).await;
+                                    }
+                                    CommandRequest::Unknown(command_name) => {
                                         eprintln!("Received unknown WebSocket command: {}", command_name);
                                         send_error(&mut socket, &command_name, "Unknown command").await;
                                 }
