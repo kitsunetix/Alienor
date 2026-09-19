@@ -247,14 +247,6 @@ async fn handle_socket(mut socket: axum::extract::ws::WebSocket, state: Arc<AppS
     let mut status_buffer = String::with_capacity(1024);
 
     'connection: loop {
-        // --- Check for MPV Shutdown ---
-        if state.player.is_shutdown() {
-            eprintln!("MPV shutdown detected by handle_socket, closing WebSocket.");
-            let _ = socket.close().await; // Attempt graceful close
-            break 'connection;
-        }
-        // --- End Check for MPV Shutdown ---
-
         tokio::select! {
             biased; // Prioritize receiving messages over sending status/pings
 
