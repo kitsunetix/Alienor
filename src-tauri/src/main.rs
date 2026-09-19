@@ -7,6 +7,7 @@ mod app_state;
 mod server;
 mod server_config;
 mod player_monitor;
+mod synchronization;
 
 use axum::extract::State as AxumState;
 use player::MpvPlayer;
