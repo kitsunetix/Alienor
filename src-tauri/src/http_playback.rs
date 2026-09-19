@@ -139,3 +139,43 @@ pub(crate) async fn set_playback_time(
         }
     }
 }
+
+pub(crate) async fn set_offset(
+    AxumState(state): AxumState<Arc<AppState>>,
+    Json(payload): Json<serde_json::Value>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    let offset_seconds = if let Some(seconds) = payload.get("seconds").and_then(|v| v.as_f64()) {
+        state
+            .player
+            .set_offset_seconds(seconds)
+            .map_err(|error| (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?;
+        seconds
+    } else if let Some(frames) = payload.get("frames").and_then(|v| v.as_i64()) {
+        let fps = payload.get("fps").and_then(|v| v.as_f64()).unwrap_or(30.0);
+        state
+            .player
+            .set_offset_frames(frames as i32, fps)
+            .map_err(|error| (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?;
+        frames as f64 / fps
+    } else {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Missing 'seconds' or 'frames' parameter".to_string(),
+        ));
+    };
+
+    println!("Updated offset to {} seconds via HTTP", offset_seconds);
+    Ok(Json(json!({
+        "status": "success",
+        "offset_seconds": offset_seconds
+    })))
+}
+
+pub(crate) async fn get_offset(
+    AxumState(state): AxumState<Arc<AppState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    Ok(Json(json!({
+        "status": "success",
+        "offset_seconds": state.player.get_offset_seconds()
+    })))
+}
