@@ -15,6 +15,7 @@ mod http_pages;
 mod http_control;
 mod http_server;
 mod server_config;
+mod player_monitor;
 
 use axum::extract::State as AxumState;
 use player::MpvPlayer;
@@ -261,20 +262,7 @@ async fn main() {
                 }
             };
 
-            // --- Monitor MPV Events ---
-            let app_handle_clone = app_handle.clone(); // Clone AppHandle for the monitor thread
-            let player_clone = Arc::clone(&player);
-            std::thread::spawn(move || {
-                loop {
-                    player_clone.check_events();
-                    if player_clone.is_shutdown() {
-                        println!("MPV player shutdown detected by monitor thread. Exiting application.");
-                        app_handle_clone.exit(0); // Exit the entire application
-                        break;
-                    }
-                    std::thread::sleep(Duration::from_millis(100));
-                }
-            });
+            player_monitor::spawn(app_handle.clone(), Arc::clone(&player));
 
             Ok(())
         })
