@@ -5,6 +5,7 @@
 //! done incrementally without changing runtime behaviour.
 
 mod commands;
+mod config;
 mod error;
 mod events;
 mod mpv;
