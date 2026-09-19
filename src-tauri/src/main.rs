@@ -11,11 +11,12 @@ mod ws_config;
 mod ws_server;
 mod http_misc;
 mod http_playback;
+mod http_pages;
 
 use axum::{
     extract::{Path, State as AxumState},
     http::StatusCode,
-    response::{Html, Json},
+    response::Json,
     routing::{get, post},
     Router,
 };
@@ -23,12 +24,11 @@ use player::MpvPlayer;
 use app_config::{load_config, save_config, AppConfig};
 use app_state::AppState;
 use http_misc::sync_room;
-use once_cell::sync::Lazy;
 use portpicker::pick_unused_port;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::io::ErrorKind;
-use std::path::{Path as StdPath, PathBuf};
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -185,75 +185,6 @@ async fn control_player(
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
 }
 
-async fn status_page(
-    AxumState(state): AxumState<Arc<AppState>>,
-) -> Result<Html<String>, (StatusCode, String)> {
-    // Cache the HTML template
-    static HTML_TEMPLATE: Lazy<String> =
-        Lazy::new(|| include_str!("../templates/status.html").to_string());
-
-    // Get the current port from the state
-    let current_port = state.port;
-    // Get the configured port (if any) for display
-    let config = state.config.lock().await;
-    let configured_port_str = config
-        .port
-        .map_or("Auto (Default: 3000)".to_string(), |p| p.to_string());
-    drop(config);
-
-    // Replace placeholders with actual values
-    let html = HTML_TEMPLATE
-        .replace("{current_port}", &current_port.to_string())
-        .replace("{configured_port}", &configured_port_str)
-        // Keep replacing {port} for backward compatibility - remove semicolon
-        .replace("{port}", &current_port.to_string());
-
-    Ok(Html(html))
-}
-
-// --- Start: Restore find_templates_dir helper ---
-fn find_templates_dir() -> PathBuf {
-    // Executable directory
-    let exe_dir = std::env::current_exe()
-        .ok()
-        .and_then(|p| p.parent().map(|p| p.to_path_buf()));
-    // Current working directory
-    let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-    // Cargo manifest dir (compile‑time)
-    const MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
-
-    // Build list of candidate paths
-    let mut candidates: Vec<PathBuf> = Vec::new();
-    // dev paths
-    candidates.push(StdPath::new(MANIFEST_DIR).join("src-tauri/templates"));
-    candidates.push(StdPath::new(MANIFEST_DIR).join("templates"));
-    candidates.push(cwd.join("src-tauri/templates"));
-    candidates.push(cwd.join("templates"));
-    // production paths (resources next to exe, or inside Resources on macOS)
-    if let Some(ref dir) = exe_dir {
-        candidates.push(dir.join("../Resources/templates")); // macOS bundle structure
-        candidates.push(dir.join("resources/templates")); // Other platforms
-        candidates.push(dir.join("templates")); // Fallback if directly next to exe
-    }
-
-    // First path that exists wins
-    for p in &candidates {
-        if p.exists() {
-            println!("Using templates directory: {:?}", p);
-            return p.clone();
-        }
-    }
-
-    // Fallback if nothing found
-    let fallback = cwd.join("src-tauri/templates"); // Should ideally not be reached in prod
-    println!(
-        "Templates directory not found in expected locations, falling back to {:?}",
-        fallback
-    );
-    fallback
-}
-// --- End: Restore find_templates_dir helper ---
-
 #[tokio::main]
 async fn main() {
     tauri::Builder::default()
@@ -311,7 +242,7 @@ async fn main() {
             app.manage(app_state.clone());
 
             // --- Start Axum Server ---
-            let static_path = find_templates_dir();
+            let static_path = http_pages::find_templates_dir();
             println!("Axum will serve static files from: {:?}", static_path);
 
             let axum_app = Router::new()
@@ -323,7 +254,7 @@ async fn main() {
                 .route("/playback/offset", get(http_playback::get_offset).post(http_playback::set_offset))
                 .route("/playback/loop", get(http_playback::get_loop).post(http_playback::set_loop))
                 .route("/status", get(http_playback::get_connection_status))
-                .route("/", get(status_page))
+                .route("/", get(http_pages::status_page))
                 .nest_service("/static", ServeDir::new(static_path))
                 .layer(CorsLayer::new().allow_origin(Any).allow_methods(Any).allow_headers(Any))
                 .with_state(app_state.clone());
