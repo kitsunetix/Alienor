@@ -46,8 +46,21 @@ pub(crate) async fn get_connection_status(
             .unwrap_or(0.0)
     };
 
-    let eof_reached = get_str("EndOfFile") == "yes";
-    let is_idle = get_str("Idle") == "yes";
+    let get_bool = |key: &str| {
+        status
+            .get(key)
+            .and_then(|value| value.as_bool())
+            .or_else(|| {
+                status
+                    .get(key)
+                    .and_then(|value| value.as_str())
+                    .map(|value| value == "yes")
+            })
+            .unwrap_or(false)
+    };
+
+    let eof_reached = get_bool("EndOfFile");
+    let is_idle = get_bool("Idle");
     let is_paused = get_str("Status") == "Paused";
     let duration = get_f64("Duration");
     let position = get_f64("Position");

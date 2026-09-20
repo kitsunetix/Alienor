@@ -67,7 +67,9 @@ impl MpvPlayer {
             .or_else(|_| handle.get_property::<f64>("estimated-vf-fps"))
             .ok();
 
-        let is_idle = idle_active_opt.unwrap_or(path_opt.is_none());
+        let has_media = path_opt.as_deref().is_some_and(|path| !path.is_empty())
+            || duration_opt.is_some_and(|duration| duration.is_finite() && duration > 0.0);
+        let is_idle = !has_media || idle_active_opt.unwrap_or(false);
         let is_paused = pause_opt.unwrap_or(is_idle);
         let status_str = if is_idle {
             "Idle".to_string()

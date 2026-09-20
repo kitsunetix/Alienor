@@ -34,8 +34,7 @@ pub(super) fn configure(mpv: &Mpv) -> Result<(), Error> {
 
 fn load_scripts(mpv: &Mpv) {
     let scripts_dir = if cfg!(debug_assertions) {
-        let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
-        std::path::Path::new(&manifest_dir).join("scripts")
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("scripts")
     } else {
         let exe_dir = std::env::current_exe()
             .expect("Failed to get executable path")
