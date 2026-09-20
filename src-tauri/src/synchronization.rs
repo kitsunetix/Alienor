@@ -23,17 +23,21 @@ pub(crate) fn seek_to_moon_time(
 
     state.player.set_last_moon_time_seconds(time);
 
-    match state.player.get_handle() {
-        Ok(handle) => {
-            if handle.get_property::<String>("path").is_err() {
-                println!(
-                    "HTTP seek: Player is idle (no path property), ignoring seek request to {}.",
-                    time
-                );
-                return Ok(MoonSeekResult::Ignored { timestamp: now });
-            }
-        }
-        Err(error) => return Err(format!("Failed to get MPV handle: {}", error)),
+    let status = state
+        .player
+        .get_status()
+        .map_err(|error| format!("Failed to get MPV status: {}", error))?;
+    let is_idle = status
+        .get("Idle")
+        .and_then(|value| value.as_bool())
+        .unwrap_or(true);
+
+    if is_idle {
+        println!(
+            "HTTP seek: Player is idle (no media loaded), ignoring seek request to {}.",
+            time
+        );
+        return Ok(MoonSeekResult::Ignored { timestamp: now });
     }
 
     if now - state.last_seek.load(Ordering::Relaxed) < MIN_SEEK_INTERVAL {
