@@ -8,18 +8,10 @@ use serde_json::Value as JsonValue;
 
 const STATUS_CACHE_MAX_AGE: Duration = Duration::from_millis(50);
 
+#[derive(Default)]
 pub(crate) struct StatusCache {
     pub(crate) value: Option<JsonValue>,
     pub(crate) updated_at: Option<Instant>,
-}
-
-impl Default for StatusCache {
-    fn default() -> Self {
-        Self {
-            value: None,
-            updated_at: None,
-        }
-    }
 }
 
 pub(crate) struct AppState {

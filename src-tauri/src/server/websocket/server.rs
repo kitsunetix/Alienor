@@ -1,21 +1,29 @@
+use axum::extract::ws::Message;
 use axum::extract::{State as AxumState, WebSocketUpgrade};
 use axum::response::IntoResponse;
-use axum::extract::ws::Message;
 use serde_json::Value as JsonValue;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::time::{interval, sleep, Instant, MissedTickBehavior};
 
-use crate::app_state::AppState;
 use super::commands::CommandRequest;
 use super::config::{
     ERROR_BACKOFF, MAX_CONSECUTIVE_ERRORS, MIN_STATUS_INTERVAL, PAUSED_STATUS_INTERVAL,
     PING_INTERVAL, PING_TIMEOUT, PLAYING_STATUS_INTERVAL,
 };
 use super::handlers::handle_command;
+use crate::app_state::AppState;
 
 const RELEVANT_STATUS_KEYS: &[&str] = &[
-    "Status", "Position", "Duration", "Path", "Title", "Loop", "Offset", "EndOfFile", "Idle",
+    "Status",
+    "Position",
+    "Duration",
+    "Path",
+    "Title",
+    "Loop",
+    "Offset",
+    "EndOfFile",
+    "Idle",
 ];
 
 pub(crate) async fn handler(
@@ -89,7 +97,7 @@ async fn handle_socket(mut socket: axum::extract::ws::WebSocket, state: Arc<AppS
 
                 match state.get_cached_status().await {
                     Ok(current_status) => {
-                        let should_send = last_sent_status.as_ref().map_or(true, |last_status| {
+                        let should_send = last_sent_status.as_ref().is_none_or(|last_status| {
                             RELEVANT_STATUS_KEYS.iter().any(|key| {
                                 current_status.get(key) != last_status.get(key)
                             })

@@ -1,18 +1,18 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod player;
+mod app_commands;
 mod app_config;
 mod app_state;
+mod player;
+mod player_monitor;
 mod server;
 mod server_config;
-mod player_monitor;
 mod synchronization;
-mod app_commands;
 
-use player::MpvPlayer;
 use app_config::load_config;
 use app_state::AppState;
+use player::MpvPlayer;
 use server::http::misc::sync_room;
 use std::io::ErrorKind;
 use std::sync::atomic::AtomicU64;
@@ -111,23 +111,28 @@ async fn main() {
                 })
                 .on_tray_icon_event(move |tray, event| {
                     let url_clone = url_clone_for_tray.clone(); // Clone again for move closure
-                    match event {
-                        TrayIconEvent::Click { button: MouseButton::Left, .. } => { // Always create new window
-                             println!("Tray icon clicked. Creating new main window...");
-                             let app = tray.app_handle();
-                             if let Err(e) = tauri::WebviewWindowBuilder::new(
-                                app,
-                                "main",
-                                WebviewUrl::External(url_clone.parse().expect("Invalid external URL in tray handler")),
-                            )
-                            .title("Alienor")
-                            .inner_size(800.0, 600.0)
-                            .build()
-                            {
-                                eprintln!("Failed to create main window from tray icon click: {}", e);
-                            }
+                    if let TrayIconEvent::Click {
+                        button: MouseButton::Left,
+                        ..
+                    } = event
+                    {
+                        println!("Tray icon clicked. Creating new main window...");
+                        let app = tray.app_handle();
+                        if let Err(e) = tauri::WebviewWindowBuilder::new(
+                            app,
+                            "main",
+                            WebviewUrl::External(
+                                url_clone
+                                    .parse()
+                                    .expect("Invalid external URL in tray handler"),
+                            ),
+                        )
+                        .title("Alienor")
+                        .inner_size(800.0, 600.0)
+                        .build()
+                        {
+                            eprintln!("Failed to create main window from tray icon click: {}", e);
                         }
-                        _ => {} // Ignore other tray events
                     }
                 })
                 .build(&app_handle)?;
@@ -166,8 +171,8 @@ async fn main() {
 
             Ok(())
         })
-        .on_window_event(|window, event| match event {
-            WindowEvent::CloseRequested { .. } => { // Removed `api`
+        .on_window_event(|window, event| {
+            if let WindowEvent::CloseRequested { .. } = event {
                 if window.label() == "main" { // Only handle main window close
                     println!("Main window close requested. Allowing close (webview terminates).");
                     // No hide, no prevent_close. Let it close naturally.
@@ -176,7 +181,6 @@ async fn main() {
                     // Optionally prevent close here if needed, but usually unnecessary
                 }
             }
-            _ => {}
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

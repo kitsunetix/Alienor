@@ -4,6 +4,7 @@ use std::sync::PoisonError;
 
 #[derive(Debug)]
 #[allow(dead_code)]
+#[allow(clippy::enum_variant_names)]
 pub enum Error {
     InitError(String),
     PropertyError(String, i32),

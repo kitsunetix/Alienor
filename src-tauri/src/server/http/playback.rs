@@ -33,8 +33,18 @@ pub(crate) async fn get_connection_status(
         .get_status()
         .map_err(|error| (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?;
 
-    let get_str = |key: &str| status.get(key).and_then(|value| value.as_str()).unwrap_or("");
-    let get_f64 = |key: &str| status.get(key).and_then(|value| value.as_f64()).unwrap_or(0.0);
+    let get_str = |key: &str| {
+        status
+            .get(key)
+            .and_then(|value| value.as_str())
+            .unwrap_or("")
+    };
+    let get_f64 = |key: &str| {
+        status
+            .get(key)
+            .and_then(|value| value.as_f64())
+            .unwrap_or(0.0)
+    };
 
     let eof_reached = get_str("EndOfFile") == "yes";
     let is_idle = get_str("Idle") == "yes";
@@ -95,7 +105,10 @@ pub(crate) async fn set_playback_time(
                 "timestamp": timestamp
         }))),
         Err(error) => {
-            eprintln!("Error executing MPV seek command even after idle check: {}", error);
+            eprintln!(
+                "Error executing MPV seek command even after idle check: {}",
+                error
+            );
             Err((StatusCode::INTERNAL_SERVER_ERROR, error))
         }
     }
@@ -145,10 +158,13 @@ pub(crate) async fn set_loop(
     AxumState(state): AxumState<Arc<AppState>>,
     Json(payload): Json<serde_json::Value>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    let enabled = payload.get("enabled").and_then(|value| value.as_bool()).ok_or((
-        StatusCode::BAD_REQUEST,
-        "Missing or invalid 'enabled' field".to_string(),
-    ))?;
+    let enabled = payload
+        .get("enabled")
+        .and_then(|value| value.as_bool())
+        .ok_or((
+            StatusCode::BAD_REQUEST,
+            "Missing or invalid 'enabled' field".to_string(),
+        ))?;
 
     state
         .player

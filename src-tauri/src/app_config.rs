@@ -8,15 +8,9 @@ use tauri::Manager;
 const CONFIG_FILE_NAME: &str = "alienor_config.json";
 const LEGACY_CONFIG_FILE_NAME: &str = "alien_config.json";
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Default, Serialize, Deserialize, Debug, Clone)]
 pub(crate) struct AppConfig {
     pub(crate) port: Option<u16>,
-}
-
-impl Default for AppConfig {
-    fn default() -> Self {
-        Self { port: None }
-    }
 }
 
 fn get_config_path(app_handle: &AppHandle) -> std::io::Result<PathBuf> {
@@ -77,10 +71,7 @@ pub(crate) fn load_config(app_handle: &AppHandle) -> AppConfig {
                                 }
                             }
                         } else {
-                            eprintln!(
-                                "Failed to read config file {:?}. Using default.",
-                                load_path
-                            );
+                            eprintln!("Failed to read config file {:?}. Using default.", load_path);
                             AppConfig::default()
                         }
                     }

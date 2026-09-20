@@ -47,17 +47,17 @@ fn main() {
     // if let Err(e) = fs::create_dir_all(&dist_dir) {
     //     panic!("Failed to create dist directory: {}", e);
     // }
-    // 
+    //
     // Build the CSS
     // println!("cargo:warning=Building CSS...");
-    // 
+    //
     // Determine npm command based on platform
     // let npm_cmd = if cfg!(target_os = "windows") {
     //     "npm.cmd" // Use npm.cmd on Windows
     // } else {
     //     "npm" // Assume npm is in PATH for non-windows
     // };
-    // 
+    //
     // Try specific common Mac paths if default fails
     // let mut npm_locations = vec![npm_cmd.to_string()]; // Start with default/windows
     // if cfg!(target_os = "macos") {
@@ -66,13 +66,13 @@ fn main() {
     //         "/opt/homebrew/bin/npm".to_string(),
     //     ]);
     // }
-    // 
+    //
     // let mut success = false;
     // let mut last_error = String::new();
-    // 
+    //
     // for npm_path in npm_locations {
     //     println!("cargo:warning=Trying npm at: {}", npm_path);
-    // 
+    //
     //     // Run npm run build:css directly (no install)
     //     match std::process::Command::new(&npm_path)
     //         .current_dir(&templates_dir)
@@ -104,14 +104,14 @@ fn main() {
     //         }
     //     }
     // }
-    // 
+    //
     // if !success {
     //     panic!(
     //         "Failed to build CSS after trying all npm locations. Last error: {}",
     //         last_error
     //     );
     // }
-    // 
+    //
     // Verify the CSS file was created
     // let css_file = dist_dir.join("styles.css");
     // if !css_file.exists() {
@@ -132,12 +132,12 @@ fn main() {
         || fs::metadata(&favicon_src)
             .ok()
             .zip(fs::metadata(&favicon_dst).ok())
-            .map_or(true, |(src_meta, dst_meta)| {
+            .is_none_or(|(src_meta, dst_meta)| {
                 src_meta
                     .modified()
                     .ok()
                     .zip(dst_meta.modified().ok())
-                    .map_or(false, |(src_time, dst_time)| src_time > dst_time)
+                    .is_some_and(|(src_time, dst_time)| src_time > dst_time)
             });
 
     if should_copy {
@@ -171,7 +171,7 @@ fn main() {
                     .ok()
                     .and_then(|m| m.modified().ok())
                     .zip(fs::metadata(&mpv_dst).ok().and_then(|m| m.modified().ok()))
-                    .map_or(true, |(src_time, dst_time)| src_time > dst_time);
+                    .is_none_or(|(src_time, dst_time)| src_time > dst_time);
 
             if should_copy {
                 match fs::copy(&libmpv_src, &mpv_dst) {
@@ -197,12 +197,10 @@ fn main() {
                     "cargo:warning=Failed to create scripts destination directory: {}",
                     e
                 );
+            } else if let Err(e) = copy_dir_all(&scripts_src, &scripts_dst) {
+                println!("cargo:warning=Failed to copy scripts directory: {}", e);
             } else {
-                if let Err(e) = copy_dir_all(&scripts_src, &scripts_dst) {
-                    println!("cargo:warning=Failed to copy scripts directory: {}", e);
-                } else {
-                    println!("cargo:warning=Scripts directory copied successfully");
-                }
+                println!("cargo:warning=Scripts directory copied successfully");
             }
         } else {
             println!(

@@ -4,9 +4,9 @@ use std::sync::mpsc;
 use std::sync::Arc;
 use std::sync::Mutex;
 
+use super::config;
 use super::error::Error;
 use super::state::MpvPlayer;
-use super::config;
 
 #[allow(dead_code)]
 impl MpvPlayer {

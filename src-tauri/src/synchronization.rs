@@ -3,7 +3,9 @@ use std::sync::atomic::Ordering;
 use crate::app_state::AppState;
 
 pub(crate) enum MoonSeekResult {
-    Ignored { timestamp: u64 },
+    Ignored {
+        timestamp: u64,
+    },
     RateLimited,
     Applied {
         adjusted_time: f64,

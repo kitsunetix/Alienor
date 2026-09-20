@@ -1,5 +1,5 @@
-use std::sync::atomic::Ordering;
 use serde_json::{self, json, Value as JsonValue};
+use std::sync::atomic::Ordering;
 
 use super::error::Error;
 use super::state::MpvPlayer;
@@ -89,7 +89,7 @@ impl MpvPlayer {
             "Title": media_title_opt.or(path_opt),
             "Volume": volume_opt.map(|volume| volume.round()),
             "Speed": speed_opt,
-            "Loop": loop_file_opt.map_or(false, |loop_state| loop_state == "inf" || loop_state == "yes"),
+            "Loop": loop_file_opt.is_some_and(|loop_state| loop_state == "inf" || loop_state == "yes"),
             "Offset": current_offset,
             "EndOfFile": eof_reached_opt,
             "Idle": is_idle,

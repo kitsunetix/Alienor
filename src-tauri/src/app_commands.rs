@@ -5,7 +5,10 @@ use crate::app_config::save_config;
 use crate::app_state::AppState;
 
 #[tauri::command]
-pub(crate) async fn exit_app(app_handle: tauri::AppHandle, state: tauri::State<'_, Arc<AppState>>) -> Result<(), String> {
+pub(crate) async fn exit_app(
+    app_handle: tauri::AppHandle,
+    state: tauri::State<'_, Arc<AppState>>,
+) -> Result<(), String> {
     println!("Exit requested.");
     state.player.exit();
     tokio::spawn(async move {
@@ -16,7 +19,11 @@ pub(crate) async fn exit_app(app_handle: tauri::AppHandle, state: tauri::State<'
 }
 
 #[tauri::command]
-pub(crate) async fn set_port_and_restart(app_handle: tauri::AppHandle, state: tauri::State<'_, Arc<AppState>>, new_port: u16) -> Result<(), String> {
+pub(crate) async fn set_port_and_restart(
+    app_handle: tauri::AppHandle,
+    state: tauri::State<'_, Arc<AppState>>,
+    new_port: u16,
+) -> Result<(), String> {
     if !(1025..=65535).contains(&new_port) {
         return Err("Invalid port number. Must be between 1025 and 65535.".to_string());
     }
@@ -30,7 +37,10 @@ pub(crate) async fn set_port_and_restart(app_handle: tauri::AppHandle, state: ta
 }
 
 #[tauri::command]
-pub(crate) async fn reset_port_and_restart(app_handle: tauri::AppHandle, state: tauri::State<'_, Arc<AppState>>) -> Result<(), String> {
+pub(crate) async fn reset_port_and_restart(
+    app_handle: tauri::AppHandle,
+    state: tauri::State<'_, Arc<AppState>>,
+) -> Result<(), String> {
     let mut config = state.config.lock().await;
     config.port = None;
     save_config(&app_handle, &config).map_err(|error| error.to_string())?;
@@ -41,7 +51,10 @@ pub(crate) async fn reset_port_and_restart(app_handle: tauri::AppHandle, state: 
 }
 
 #[tauri::command]
-pub(crate) async fn clear_saved_port(app_handle: tauri::AppHandle, state: tauri::State<'_, Arc<AppState>>) -> Result<(), String> {
+pub(crate) async fn clear_saved_port(
+    app_handle: tauri::AppHandle,
+    state: tauri::State<'_, Arc<AppState>>,
+) -> Result<(), String> {
     let mut config = state.config.lock().await;
     if config.port.is_none() {
         return Ok(());

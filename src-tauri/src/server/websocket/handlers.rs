@@ -2,10 +2,10 @@ use axum::extract::ws::{Message, WebSocket};
 use serde_json::json;
 use std::sync::Arc;
 
-use crate::app_state::AppState;
-use crate::player::Error as PlayerError;
 use super::commands::CommandRequest;
 use super::protocol::send_error;
+use crate::app_state::AppState;
+use crate::player::Error as PlayerError;
 
 pub(crate) async fn handle_command(
     command: CommandRequest,
@@ -42,21 +42,23 @@ pub(crate) async fn handle_command(
                 "WebSocket seek: adjusted to {} from {} (offset {})",
                 adjusted_time, position, offset
             );
-            if let Err(error) = state.player.command(
-                "seek",
-                &[&adjusted_time.to_string(), "absolute", "exact"],
-            ) {
+            if let Err(error) = state
+                .player
+                .command("seek", &[&adjusted_time.to_string(), "absolute", "exact"])
+            {
                 eprintln!("Error seeking: {}", error);
                 send_error(socket, "seek", &error.to_string()).await;
             }
         }
-        CommandRequest::SetOffset { seconds, frames, fps } => {
-            let mut offset_result: Result<f64, PlayerError> = Err(
-                PlayerError::CommandError(
-                    "Invalid offset parameters".to_string(),
-                    -1,
-                ),
-            );
+        CommandRequest::SetOffset {
+            seconds,
+            frames,
+            fps,
+        } => {
+            let mut offset_result: Result<f64, PlayerError> = Err(PlayerError::CommandError(
+                "Invalid offset parameters".to_string(),
+                -1,
+            ));
             let mut update_type = "seconds";
             let mut original_value = 0.0;
 
