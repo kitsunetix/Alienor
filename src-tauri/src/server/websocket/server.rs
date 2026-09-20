@@ -12,6 +12,7 @@ use super::config::{
     PING_INTERVAL, PING_TIMEOUT, PLAYING_STATUS_INTERVAL,
 };
 use super::handlers::handle_command;
+use super::protocol::send_error;
 use crate::app_state::AppState;
 
 const RELEVANT_STATUS_KEYS: &[&str] = &[
@@ -59,9 +60,27 @@ async fn handle_socket(mut socket: axum::extract::ws::WebSocket, state: Arc<AppS
                     Some(Ok(Message::Text(text))) => {
                         last_pong = Instant::now();
                         consecutive_errors = 0;
-                        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&text) {
-                            if let Some(command) = CommandRequest::from_json(&json) {
-                                handle_command(command, &mut socket, &state).await;
+                        match serde_json::from_str::<serde_json::Value>(&text) {
+                            Ok(json) => match CommandRequest::from_json(&json) {
+                                Some(command) => {
+                                    handle_command(command, &mut socket, &state).await;
+                                }
+                                None => {
+                                    send_error(
+                                        &mut socket,
+                                        "unknown",
+                                        "Missing or invalid 'command' field",
+                                    )
+                                    .await;
+                                }
+                            },
+                            Err(error) => {
+                                send_error(
+                                    &mut socket,
+                                    "unknown",
+                                    &format!("Invalid JSON: {}", error),
+                                )
+                                .await;
                             }
                         }
                     }
