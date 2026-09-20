@@ -9,7 +9,7 @@ pub(crate) async fn status_page(
     AxumState(state): AxumState<Arc<AppState>>,
 ) -> Result<Html<String>, (StatusCode, String)> {
     static HTML_TEMPLATE: Lazy<String> =
-        Lazy::new(|| include_str!("../templates/status.html").to_string());
+        Lazy::new(|| include_str!("../../../templates/status.html").to_string());
 
     let current_port = state.port;
     let config = state.config.lock().await;

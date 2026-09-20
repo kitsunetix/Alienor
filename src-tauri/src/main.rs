@@ -10,20 +10,17 @@ mod player_monitor;
 mod synchronization;
 mod app_commands;
 
-use axum::extract::State as AxumState;
 use player::MpvPlayer;
 use app_config::load_config;
 use app_state::AppState;
 use server::http::misc::sync_room;
-use serde::{Deserialize, Serialize};
-use serde_json::json;
 use std::io::ErrorKind;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 use tauri::{
     menu::{MenuBuilder, MenuItemBuilder},
     tray::{MouseButton, TrayIconBuilder, TrayIconEvent},
-    AppHandle, Manager, WebviewUrl, WindowEvent,
+    Manager, WebviewUrl, WindowEvent,
 };
 
 #[tokio::main]
